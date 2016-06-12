@@ -182,11 +182,74 @@ interpose_good_service <- function(df) {
 }
 
 llik_nb <- function(par, x) {
-    ## log-likelihood of negative Binomial model
+    ## log-likelihood of negative Binomial (NB) model
     r <- par[1] # size in dnbinom()
     q <- par[2] # prob in dnbinom()
     dnbinom(x, r, q, log = T) %>% sum
 }
 
+llik_nb_rt <- function(par, x, t) {
+    ## log-likelihood of NB model w/ trend in r (size)
+    if (length(x) != length(t)) {
+        stop("lengths of x and t have to be equal.")
+    }
+    r0 <- par[1]
+    q <- par[2]
+    theta <- par[3]
+    rt <- r0 + theta * t
+    if (any(rt <= 0.0) || q <= 0.0 || q > 1.0) {
+        l <- -Inf
+    }
+    else {
+        l <- dnbinom(x, rt, q, log = T) %>% sum
+    }
+    l
+}
 
+llik_nb_qt <- function(par, x, t) {
+    ## log-likelihood of NB model w/ trend in q (prob)
+    if (length(x) != length(t)) {
+        stop("lengths of x and t have to be equal.")
+    }
+    r <- par[1]
+    q0 <- par[2]
+    theta <- par[3]
+    qt <- q0 + theta * t
+    if (!all(qt %>% between(0.0, 1.0)) || r <= 0.0) {
+        l <- -Inf
+    }
+    else {
+        l <- dnbinom(x, r, qt, log = T) %>% sum
+    }
+    l
+}
 
+llik_nb_rk <- function(par, x, t) {
+    ## log-likelihood of NB model w/ chgpt in r (size)
+    if (length(x) != length(t)) {
+        stop("lengths of x and t have to be equal.")
+    }
+    n <- length(x)
+    r1 <- par[1]
+    r2 <- par[2]
+    q <- par[3]
+    k <- par[4]
+    if (r1 <= 0.0 || r2 <= 0.0 || !(q %>% dplyr::between(0.0, 1.0)) || !(k %>% dplyr::between(1L, n))) {
+        l <- -Inf
+    }
+    else if (k == n) {
+        ## no changepoint 
+        l <- dnbinom(x, r1, q, log = T) %>% sum
+    }
+    else {
+        ## a changepoint between 1 and n exclusive
+        l <- dnbinom(x[1L:k], r1, q, log = T) %>% sum + 
+             dnbinom(x[(k+1L):n], r2, q, log = T) %>% sum
+    }
+    l
+}
+
+llik_nb_rk_fix_k <- function(par, x, t, k) {
+    ## wrapper of llik_nb_rk() for optim() w/ fixed k
+    llik_nb_rk(c(par, k), x, t)
+}

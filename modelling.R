@@ -43,4 +43,60 @@ df0.counts <- seq(0, df0.weeks$all %>% max) %>%
 
 
 
+### linear trend model
+t0 <- seq_along(df0.weeks$all)
+obj0.nb.rt <- optim(c(mle.nb, 1e-4), llik_nb_rt, x = df0.weeks$all, t = t0, control = optim.ctrl)
+mle.nb.rt <- obj0.nb.rt$par
+obj0.nb.qt <- optim(c(mle.nb, 1e-4), llik_nb_qt, x = df0.weeks$all, t = t0, control = optim.ctrl)
+mle.nb.qt <- obj0.nb.qt$par
+
+
+
+### likelihood ratio test
+(data_frame(critical.value = qchisq(0.95, 1),
+            test.stat.nb.rt = 2 * (obj0.nb.rt$value - obj0.nb$value),
+            test.stat.nb.qt = 2 * (obj0.nb.qt$value - obj0.nb$value)))
+### interestingly, theta is "significant" in both models
+
+
+
+### new data_frame for vis
+df1.weeks <- df0.weeks %>% 
+    mutate(t = t0, 
+           rt = (mle.nb.rt[1] + mle.nb.rt[3] * t0),
+           q = mle.nb.rt[2],
+           mean.rt = rt * (1.0 - q)/ q, 
+           r = mle.nb.qt[1],
+           qt = (mle.nb.qt[2] + mle.nb.qt[3] * t0),
+           mean.qt = r * (1.0 - qt) / qt)
+
+
+
+### chgpt in r, likelihood method
+l0.rk <- list()
+for (i in seq_along(t0)) {
+    print(i)
+    par0.rk <- c(mle.nb[1], mle.nb[1], mle.nb[2])
+    obj0.rk <- optim(par0.rk, llik_nb_rk_fix_k, x = df0.weeks$all, t = t0, k = i, control = optim.ctrl)
+    l0.rk[[i]] <- data_frame(
+        llik = obj0.rk$value,
+        r1 = obj0.rk$par[1],
+        r2 = obj0.rk$par[2],
+        q = obj0.rk$par[3]
+    )
+}
+df0.rk <- l0.rk %>% 
+    bind_rows %>% 
+    bind_cols(df0.weeks, .) %>% 
+    mutate(
+        k = which.max(llik),
+        llik = llik[k],
+        r1 = r1[k],
+        r2 = r2[k],
+        q = q[k],
+        r = ifelse(week <= week[k], r1, r2),
+        mean = r * (1.0 - q) / q
+    )
+    
+
 
