@@ -224,32 +224,116 @@ llik_nb_qt <- function(par, x, t) {
     l
 }
 
-llik_nb_rk <- function(par, x, t) {
+llik_nb_rk <- function(r1, r2, q, k, x) {
     ## log-likelihood of NB model w/ chgpt in r (size)
-    if (length(x) != length(t)) {
-        stop("lengths of x and t have to be equal.")
-    }
     n <- length(x)
-    r1 <- par[1]
-    r2 <- par[2]
-    q <- par[3]
-    k <- par[4]
     if (r1 <= 0.0 || r2 <= 0.0 || !(q %>% dplyr::between(0.0, 1.0)) || !(k %>% dplyr::between(1L, n))) {
         l <- -Inf
     }
     else if (k == n) {
-        ## no changepoint 
+        ## no chgpt 
         l <- dnbinom(x, r1, q, log = T) %>% sum
     }
     else {
-        ## a changepoint between 1 and n exclusive
+        ## a chgpt between 1 and n exclusive
         l <- dnbinom(x[1L:k], r1, q, log = T) %>% sum + 
              dnbinom(x[(k+1L):n], r2, q, log = T) %>% sum
     }
     l
 }
-
-llik_nb_rk_fix_k <- function(par, x, t, k) {
+llik_nb_rk_fix_k <- function(par, k, x) {
     ## wrapper of llik_nb_rk() for optim() w/ fixed k
-    llik_nb_rk(c(par, k), x, t)
+    llik_nb_rk(par[1], par[2], par[3], k, x)
 }
+
+llik_nb_qk <- function(r, q1, q2, k, x) {
+    ## log-likelihood of NB model w/ chgpt in q (prob)
+    n <- length(x)
+    if (r <= 0.0 || !(q1 %>% dplyr::between(0.0, 1.0)) || !(q2 %>% dplyr::between(0.0, 1.0)) || !(k %>% dplyr::between(1L, n))) {
+        l <- -Inf
+    }
+    else if (k == n) {
+        ## no chgpt
+        l <- dnbinom(x, r, q1, log = T) %>% sum
+    }
+    else {
+        ## a chgpt between 1 and n exclusive
+        l <- dnbinom(x[1L:k], r, q1, log = T) %>% sum + 
+             dnbinom(x[(k+1L):n], r, q2, log = T) %>% sum
+    }
+    l
+}
+llik_nb_qk_fix_k <- function(par, k, x) {
+    ## wrapper of llik_nb_qk() for optim() w/ fixed k
+    llik_nb_qk(par[1], par[2], par[3], k, x)
+}
+
+llik_nb_rqk <- function(r1, r2, q1, q2, k, x) {
+    ## log-likelihood of NB model w/ chgpt in r & q simultaneously
+    n <- length(x)
+    if (r1 <= 0.0 || r2 <= 0.0 || !(q1 %>% dplyr::between(0.0, 1.0)) || !(q2 %>% dplyr::between(0.0, 1.0)) || !(k %>% dplyr::between(1L, n))) {
+        l <- -Inf
+    }
+    else if (k == n) {
+        ## no chgpt
+        l <- dnbinom(x, r1, q1, log = T) %>% sum
+    }
+    else {
+        ## a chgpt between 1 and n exclusive
+        l <- dnbinom(x[1L:k], r1, q1, log = T) %>% sum + 
+             dnbinom(x[(k+1L):n], r2, q2, log = T) %>% sum
+    }
+    l
+}
+llik_nb_rqk_fix_k <- function(par, k, x) {
+    ## wrapper of llik_nb_rqk() for optim() w/ fixed k
+    llik_nb_rqk(par[1], par[2], par[3], par[4], k, x)
+} 
+
+llik_nb_rkqk <- function(r1, r2, q1, q2, kr, kq, x) {
+    ## log-likelihood of NB model w/ chgpt in r & q separately
+    n <- length(x)
+    if (r1 <= 0.0 || r2 <= 0.0 || !(q1 %>% dplyr::between(0.0, 1.0)) || !(q2 %>% dplyr::between(0.0, 1.0)) || !(kr %>% dplyr::between(1L, n)) || !(kq %>% dplyr::between(1L, n))) {
+        l <- -Inf
+    }
+    else if (kr == n && kq == n) {
+        ## no chgpt for both r & q
+        l <- dnbinom(x, r1, q1, log = T) %>% sum
+    }
+    else if (kr == n) { 
+        ## no chgpt for r
+        l <- dnbinom(x[1L:kq], r1, q1, log = T) %>% sum + 
+             dnbinom(x[(kq+1L):n], r1, q2, log = T) %>% sum
+    }
+    else if (kq == n) { 
+        ## no chgpt for q
+        l <- dnbinom(x[1L:kr], r1, q1, log = T) %>% sum + 
+             dnbinom(x[(kr+1L):n], r2, q1, log = T) %>% sum
+    } 
+    else if (kr == kq) {
+        ## both chgpts coincide and between 1 & n exclusive
+        l <- dnbinom(x[1L:kr], r1, q1, log = T) %>% sum +
+             dnbinom(x[(kq+1L):n], r2, q2, log = T) %>% sum
+    }
+    else if (kr < kq) {
+        ## chgpt for r before chgpt for q, both chgpts between 1 and n exclusive
+        l <- dnbinom(x[1L:kr], r1, q1, log = T) %>% sum + 
+             dnbinom(x[(kr+1L):kq], r2, q1, log = T) %>% sum + 
+             dnbinom(x[(kq+1L):n], r2, q2, log = T) %>% sum
+    }
+    else if (kr > kq) {
+        ## chgpt for q before chgpt for r, both chgpts between 1 and n exclusive
+        l <- dnbinom(x[1L:kq], r1, q1, log = T) %>% sum + 
+             dnbinom(x[(kq+1L):kr], r1, q2, log = T) %>% sum + 
+             dnbinom(x[(kr+1L):n], r2, q2, log = T) %>% sum
+    }
+    l
+}
+llik_nb_rkqk_fix_k <- function(par, kr, kq, x) {
+    ## wrapper of llik_nb_rkqk() for optim() w/ fixed kr & kq
+    llik_nb_rkqk(par[1], par[2], par[3], par[4], kr, kq, x)
+} 
+
+
+
+

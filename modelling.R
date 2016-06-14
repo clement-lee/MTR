@@ -77,7 +77,7 @@ l0.rk <- list()
 for (i in seq_along(t0)) {
     print(i)
     par0.rk <- c(mle.nb[1], mle.nb[1], mle.nb[2])
-    obj0.rk <- optim(par0.rk, llik_nb_rk_fix_k, x = df0.weeks$all, t = t0, k = i, control = optim.ctrl)
+    obj0.rk <- optim(par0.rk, llik_nb_rk_fix_k, x = df0.weeks$all, k = i, control = optim.ctrl)
     l0.rk[[i]] <- data_frame(
         llik = obj0.rk$value,
         r1 = obj0.rk$par[1],
@@ -90,13 +90,89 @@ df0.rk <- l0.rk %>%
     bind_cols(df0.weeks, .) %>% 
     mutate(
         k = which.max(llik),
-        llik = llik[k],
         r1 = r1[k],
         r2 = r2[k],
         q = q[k],
         r = ifelse(week <= week[k], r1, r2),
         mean = r * (1.0 - q) / q
     )
+
+
+
+### chgpt in q, likelihood method
+l0.qk <- list()
+for (i in seq_along(t0)) {
+    print(i)
+    par0.qk <- c(mle.nb[1], mle.nb[2], mle.nb[2])
+    obj0.qk <- optim(par0.qk, llik_nb_qk_fix_k, x = df0.weeks$all, k = i, control = optim.ctrl)
+    l0.qk[[i]] <- data_frame(
+        llik = obj0.qk$value,
+        r = obj0.qk$par[1],
+        q1 = obj0.qk$par[2],
+        q2 = obj0.qk$par[3]
+    )
+}
+df0.qk <- l0.qk %>% 
+    bind_rows %>% 
+    bind_cols(df0.weeks, .) %>% 
+    mutate(
+        k = which.max(llik),
+        r = r[k],
+        q1 = q1[k],
+        q2 = q2[k],
+        q = ifelse(week <= week[k], q1, q2),
+        mean = r * (1.0 - q) / q
+    )
+
+
+
+### chgpt in r & q simultaneously, likelihood method
+l0.rqk <- list()
+for (i in seq_along(t0)) {
+    print(i)
+    par0.rqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
+    obj0.rqk <- optim(par0.rqk, llik_nb_rqk_fix_k, x = df0.weeks$all, k = i, control = optim.ctrl)
+    l0.rqk[[i]] <- data_frame(
+        llik = obj0.rqk$value,
+        r1 = obj0.rqk$par[1],
+        r2 = obj0.rqk$par[2],
+        q1 = obj0.rqk$par[3],
+        q2 = obj0.rqk$par[4]
+    )
+}
+df0.rqk <- l0.rqk %>% 
+    bind_rows %>% 
+    bind_cols(df0.weeks, .) %>% 
+    mutate(
+        k = which.max(llik),
+        r1 = r1[k],
+        r2 = r2[k],
+        q1 = q1[k],
+        q2 = q2[k],
+        r = ifelse(week <= week[k], r1, r2),
+        q = ifelse(week <= week[k], q1, q2),
+        mean = r * (1.0 - q) / q
+    )
+
+
+
+### chgpt in r & q separately, llikelihood method
+r1.rkqk <- r2.rkqk <- 
+q1.rkqk <- q2.rkqk <- 
+l0.rkqk <- matrix(NA, length(t0), length(t0))
+for (i in seq_along(t0)) {
+    for (j in seq_along(t0)) {
+        print(c(i, j))
+        par0.rkqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
+        obj0.rkqk <- optim(par0.rkqk, llik_nb_rkqk_fix_k, x = df0.weeks$all, kr = i, kq = j, control = optim.ctrl)
+        r1.rkqk[i, j] <- obj0.rkqk$par[1]
+        r2.rkqk[i, j] <- obj0.rkqk$par[2]
+        q1.rkqk[i, j] <- obj0.rkqk$par[3]
+        q2.rkqk[i, j] <- obj0.rkqk$par[4]
+        l0.rkqk[i, j] <- obj0.rkqk$value
+    }
+}
     
+
 
 
