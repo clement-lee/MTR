@@ -59,6 +59,12 @@ df0.weeks %>% # monthly counterpart
     geom_point() +
     labs(title = "Weekly number of all incidents",
          x = "Time", y = "Number of incidents")
+df0.days %>% 
+    ggplot(aes(op_date, all)) + 
+    geom_line() + 
+    geom_point() +
+    labs(title = "Daily number of all incidents",
+         x = "Time", y = "Number of incidents")
 
 ## ACF (to show independence)
 df0.months %>% 
@@ -67,6 +73,9 @@ df0.months %>%
 df0.weeks %>% 
     magrittr::extract2("all") %>%
     acf(100)
+df0.days %>% 
+    magrittr::extract2("all") %>% 
+    acf(1000)
 
 
 
@@ -139,53 +148,53 @@ df4.match %>%
 
 
 
-### 06) Bar chart of weekly number of incidents, for 2 types and 2 lines
-df0.weeks %>% 
+### 06) Bar chart of daily number of incidents, for 2 types and 2 lines
+df0.days %>% 
     ggplot(aes(signal)) + # flexible position of aes - see below
     geom_bar() +
-    labs(title = "Bar chart of weekly number of signal faults",
-         x = "Number of incidents", y = "Count of weeks")
-df0.weeks %>% 
+    labs(title = "Bar chart of daily number of signal faults",
+         x = "Number of incidents", y = "Count of days")
+df0.days %>% 
     ggplot + 
     geom_bar(aes(train)) + # flexible position of aes - see above
-    labs(title = "Bar chart of weekly number of faulty trains",
-         x = "Number of incidents", y = "Count of weeks")
-df0.weeks %>% 
+    labs(title = "Bar chart of daily number of faulty trains",
+         x = "Number of incidents", y = "Count of days")
+df0.days %>% 
     ggplot(aes(east.rail)) +
     geom_bar() +
-    labs(title = "Bar chart of weekly number of incidents, East Rail Line",
-         x = "Number of incidents", y = "Count of weeks")
-df0.weeks %>% 
+    labs(title = "Bar chart of daily number of incidents, East Rail Line",
+         x = "Number of incidents", y = "Count of days")
+df0.days %>% 
     ggplot + 
     geom_bar(aes(kwun.tong)) + 
-    labs(title = "Bar chart of weekly number of incidents, Kwun Tong Line",
-         x = "Number of incidents", y = "Count of weeks")
+    labs(title = "Bar chart of daily number of incidents, Kwun Tong Line",
+         x = "Number of incidents", y = "Count of days")
 ## not really comparable b/w them (and with aes(all))
 
 
 
 
 
-### 07) Bar chart of weekly number of incidents, with fitted results
-df0.weeks %>% 
+### 07) Bar chart of daily number of incidents, with fitted results
+df0.days %>% 
     ggplot(aes(all)) + 
     geom_bar() + # counted when visualising
-    labs(title = "Bar chart of weekly number of all incidents",
-         x = "Number of incidents", y = "Count of weeks")
+    labs(title = "Bar chart of daily number of all incidents",
+         x = "Number of incidents", y = "Count of days")
 ## above and below produce the SAME plot!
 ## this is where objects obtained in modelling.R kick in
 df0.counts %>% # counted when extracting
     ggplot(aes(count, all)) + 
     geom_bar(stat = "identity") + # this is the trick
-    labs(title = "Bar chart of weekly number of all incidents",
-         x = "Number of incidents", y = "Count of weeks")
+    labs(title = "Bar chart of daily number of all incidents",
+         x = "Number of incidents", y = "Count of days")
 ## after fitting, compare w/ above - same, but add estimated values
 df0.counts %>% 
     gather(type, value, all, all.est.nb) %>% 
     ggplot(aes(count, value)) + 
     geom_bar(aes(fill = type), stat = "identity", position = "dodge") + 
-    labs(title = "Bar chart of weekly number of all incidents",
-         x = "Number of incidents", y = "Count of weeks") + 
+    labs(title = "Bar chart of daily number of all incidents",
+         x = "Number of incidents", y = "Count of days") + 
     scale_fill_discrete(name = NULL, 
                         labels = c("Observed", "Estimated"),
                         breaks = c("all", "all.est.nb"))

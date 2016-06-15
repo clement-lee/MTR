@@ -169,6 +169,32 @@ df0.months <- (df4.match$month %>% min + months(0:(n0.months - 1))) %>%
 
 
 
+### 11) daily number of incidents (similar to df0.weeks & df0.months)
+df0.days <- seq(df4.match$op_date %>% min, df4.match$op_date %>% max, by = 1L) %>% 
+    data_frame(op_date = .) %>% ## complete vector of days
+    ## i) all
+    left_join(df4.match %>% count(op_date), by = "op_date") %>%
+    mutate(all = ifelse(is.na(n), 0L, n)) %>%
+    select(-n) %>%
+    ## ii) signal
+    left_join(df4.match %>% filter(type == "signal") %>% count(op_date), by = "op_date") %>% 
+    mutate(signal = ifelse(is.na(n), 0L, n)) %>%
+    select(-n) %>% 
+    ## iii) train
+    left_join(df4.match %>% filter(type == "train") %>% count(op_date), by = "op_date") %>%
+    mutate(train = ifelse(is.na(n), 0L, n)) %>% 
+    select(-n) %>%
+    ## iv) East Rail Line
+    left_join(df4.match %>% filter(line == "East Rail Line") %>% count(op_date), by = "op_date") %>% 
+    mutate(east.rail = ifelse(is.na(n), 0L, n)) %>% 
+    select(-n) %>% 
+    ## v) Kwun Tong Line
+    left_join(df4.match %>% filter(line == "Kwun Tong Line") %>% count(op_date), by = "op_date") %>% 
+    mutate(kwun.tong = ifelse(is.na(n), 0L, n)) %>% 
+    select(-n)
+n0.days <- df0.days %>% nrow
+
+
 
 
 
