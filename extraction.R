@@ -1,7 +1,7 @@
 ### 00) workspace preliminary
 options(width = 200) # changes when console screen does so, on windows
 remove(list = ls())
-print(date())
+print(base::date())
 options(width = 150)
 library(magrittr) # pipe operator
 library(rjson) # read files in json format

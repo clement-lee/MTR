@@ -1,5 +1,7 @@
 remove(list = ls())
 source("extraction.R") # run the whole script
+library(Rcpp)
+sourceCpp("mtr.cpp") # load required llik() functions etc.
 optim.ctrl <- list(fnscale = -1, reltol = 1e-10, maxit = 5000)
 
 
@@ -156,7 +158,7 @@ df0.rqk <- l0.rqk %>%
 
 
 
-### chgpt in r & q separately, llikelihood method
+### chgpt in r & q separately, likelihood method
 if (FALSE) {
     r1.rkqk <- r2.rkqk <- 
     q1.rkqk <- q2.rkqk <- 
