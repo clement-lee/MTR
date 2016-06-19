@@ -101,6 +101,11 @@ df0.rk <- l0.rk %>%
 
 
 
+### chgpt in r, Bayesian method
+system.time(rwm0.rk <- rwm_nb_rk(2.5, 0.9, 0.2, 100, df0.days$all, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.01s / 3 iterations (no thinning)
+
+
+
 ### chgpt in q, likelihood method
 l0.qk <- list()
 for (i in seq_along(t0)) {
@@ -125,6 +130,11 @@ df0.qk <- l0.qk %>%
         q = ifelse(op_date <= op_date[k], q1, q2),
         mean = r * (1.0 - q) / q
     )
+
+
+
+### chgpt in q, Bayesian method
+system.time(rwm0.qk <- rwm_nb_qk(0.9, 0.2, 0.2, 100, df0.days$all, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.01s / 3 iterations (no thinning)
 
 
 
@@ -158,6 +168,11 @@ df0.rqk <- l0.rqk %>%
 
 
 
+### chgpt in r & q simultaneously, Bayesian method
+system.time(rwm0.rqk <- rwm_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, df0.days$all, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.004s / iteration (no thinning)
+
+
+
 ### chgpt in r & q separately, likelihood method
 if (FALSE) {
     r1.rkqk <- r2.rkqk <- 
@@ -176,7 +191,8 @@ if (FALSE) {
         }
     }
 }
-    
 
 
 
+### chgpt in r & q separately, Bayesian method
+system.time(rwm0.rkqk <- rwm_nb_rkqk(2.5, 0.9, 0.2, 0.2, 500, 500, df0.days$all, 0.375, 0.375, 300, 300, 2e+4, 100, 1e+5)) # ~0.00567s per iteration (no thinning)

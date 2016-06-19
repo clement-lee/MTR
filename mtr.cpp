@@ -85,10 +85,10 @@ const double llik_nb_rk(const double r1, const double r2, const double q, const 
   }
   else {
     // a chgpt less than n
-    IntegerVector ind1 = seq_len(k) - 1, 
-      ind2 = seq_len(n) - 1,
-      ind3 = setdiff(ind2, ind1);
-    NumericVector x1 = x[ind1], x2 = x[ind3];
+    IntegerVector indn = seq_len(n) - 1,
+      ind1 = seq_len(k) - 1,
+      ind2 = setdiff(indn, ind1);
+    NumericVector x1 = x[ind1], x2 = x[ind2];
     llik = sum(dnbinom(x1, r1, q, true)) + sum(dnbinom(x2, r2, q, true));
   }
   return llik;
@@ -117,18 +117,17 @@ const double lpost_nb_rk(const double r1, const double r2, const double q, const
 }
 
 // [[Rcpp::export]]
-List rwm_nb_rk(const double r1, const double r2, const double q, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_q, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
+List rwm_nb_rk(const double r1, const double r2, const double q, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
   // componentwise RWM of NB model w/ chgpt in r (size)
-  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q_curr = q, q_prop, k_curr = k, k_prop;
+  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q_curr = q, k_curr = k, k_prop;
   double lpost_curr = lpost_nb_rk(r1_curr, r2_curr, q_curr, k_curr, x, a1, b1, a2, b2), lpost_prop, log_alpha;
   NumericMatrix par_mat(N, 4);
-  NumericVector lpost_vec(N), log_u(4);
+  NumericVector lpost_vec(N), log_u(3);
   const int n = x.size();
-  const IntegerVector seqn = seq_len(k);
   int i, j;
   RNGScope scope;
   for (i = 0; i < N * thin + burnin; i++) {
-    log_u = log(runif(4)); // for acceptance-rejection
+    log_u = log(runif(3)); // for acceptance-rejection
     // update r1
     r1_prop = exp(rnorm(1, log(r1_curr), s_r1)[0]);
     lpost_prop = lpost_nb_rk(r1_prop, r2_curr, q_curr, k_curr, x, a1, b1, a2, b2);
@@ -146,18 +145,13 @@ List rwm_nb_rk(const double r1, const double r2, const double q, const int k, co
       lpost_curr = lpost_prop;
     }
     // update q
-    q_prop = rnorm(1, q_curr, s_q)[0];
-    lpost_prop = lpost_nb_rk(r1_curr, r2_curr, q_prop, k_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[2] < log_alpha) {
-      q_curr = q_prop;
-      lpost_curr = lpost_prop;
-    }
+    q_curr = rbeta(1, k_curr * r1_curr + (n - k_curr) * r2_curr + 1.0, sum(x) + 1.0)[0];
+    lpost_curr = lpost_nb_rk(r1_curr, r2_curr, q_curr, k_curr, x, a1, b1, a2, b2);
     // update k
     k_prop = (int) round(rnorm(1, k_curr + 0.0, s_k)[0]);
     lpost_prop = lpost_nb_rk(r1_curr, r2_curr, q_curr, k_prop, x, a1, b1, a2, b2);
     log_alpha = lpost_prop - lpost_curr;
-    if (log_u[3] < log_alpha) {
+    if (log_u[2] < log_alpha) {
       k_curr = k_prop;
       lpost_curr = lpost_prop;
     }
@@ -189,10 +183,10 @@ const double llik_nb_qk(const double r, const double q1, const double q2, const 
   }
   else {
     // a chgpt less than n
-    IntegerVector ind1 = seq_len(k) - 1, 
-      ind2 = seq_len(n) - 1,
-      ind3 = setdiff(ind2, ind1);
-    NumericVector x1 = x[ind1], x2 = x[ind3];
+    IntegerVector indn = seq_len(n) - 1,
+      ind1 = seq_len(k) - 1,
+      ind2 = setdiff(indn, ind1);
+    NumericVector x1 = x[ind1], x2 = x[ind2];
     llik = sum(dnbinom(x1, r, q1, true)) + sum(dnbinom(x2, r, q2, true));
   }
   return llik;
@@ -219,6 +213,60 @@ const double lpost_nb_qk(const double r, const double q1, const double q2, const
 }
 
 // [[Rcpp::export]]
+List rwm_nb_qk(const double r, const double q1, const double q2, const int k, const NumericVector x, const double s_r, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a = 0.01, const double b = 0.01) {
+  // componentwise RWM of NB model w/ chgpt in q (prob)
+  double r_curr = r, r_prop, q1_curr = q1, q2_curr = q2, k_curr = k, k_prop;
+  double lpost_curr = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_curr, x, a, b), lpost_prop, log_alpha;
+  NumericMatrix par_mat(N, 4);
+  NumericVector lpost_vec(N), log_u(2), x1, x2;
+  const int n = x.size();
+  const IntegerVector indn = seq_len(n) - 1;
+  IntegerVector ind1, ind2;
+  int i, j;
+  RNGScope scope;
+  for (i = 0; i < N * thin + burnin; i++) {
+    log_u = log(runif(2));
+    // update r
+    r_prop = exp(rnorm(1, log(r_curr), s_r)[0]);
+    lpost_prop = lpost_nb_qk(r_prop, q1_curr, q2_curr, k_curr, x, a, b);
+    log_alpha = lpost_prop - lpost_curr + log(r_prop) - log(r_curr);
+    if (log_u[0] < log_alpha) {
+      r_curr = r_prop;
+      lpost_curr = lpost_prop;
+    }
+    // update q1
+    ind1 = seq_len(k_curr) - 1;
+    x1 = x[ind1];
+    q1_curr = rbeta(1, k_curr * r_curr + 1.0, sum(x1) + 1.0)[0];
+    lpost_curr = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_curr, x, a, b);
+    // update q2
+    ind2 = setdiff(indn, ind1);
+    x2 = x[ind2];
+    q2_curr = rbeta(1, (n - k_curr) * r_curr + 1.0, sum(x2) + 1.0)[0];
+    lpost_curr = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_curr, x, a, b);
+    // update k
+    k_prop = (int) round(rnorm(1, k_curr + 0.0, s_k)[0]);
+    lpost_prop = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_prop, x, a, b);
+    log_alpha = lpost_prop - lpost_curr;
+    if (log_u[1] < log_alpha) {
+      k_curr = k_prop;
+      lpost_curr = lpost_prop;
+    }
+    // save for output
+    if (i >= burnin && (i - burnin + 1) % thin == 0) {
+      j = (i - burnin + 1) / thin - 1;
+      par_mat(j, _) = NumericVector::create(r_curr, q1_curr, q2_curr, k_curr);
+      lpost_vec[j] = lpost_curr;
+    }
+  }
+  // return
+  List L;
+  L["par"] = par_mat;
+  L["lpost"] = lpost_vec;
+  return L;
+}
+
+// [[Rcpp::export]]
 const double llik_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x) {
   // log-likelihood of NB model w/ chgpt in r & q simultaneously
   const int n = x.size();
@@ -232,10 +280,10 @@ const double llik_nb_rqk(const double r1, const double r2, const double q1, cons
   }
   else {
     // a chgpt less than n
-    IntegerVector ind1 = seq_len(k) - 1, 
-      ind2 = seq_len(n) - 1,
-      ind3 = setdiff(ind2, ind1);
-    NumericVector x1 = x[ind1], x2 = x[ind3];
+    IntegerVector indn = seq_len(n) - 1,
+      ind1 = seq_len(k) - 1,
+      ind2 = setdiff(indn, ind1);
+    NumericVector x1 = x[ind1], x2 = x[ind2];
     llik = sum(dnbinom(x1, r1, q1, true)) + sum(dnbinom(x2, r2, q2, true));
   }
   return llik;
@@ -262,18 +310,19 @@ const double lpost_nb_rqk(const double r1, const double r2, const double q1, con
 }
 
 // [[Rcpp::export]]
-List rwm_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_q1, const double s_q2, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
+List rwm_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
   // componentwise RWM of NB model w/ chgpt in r & q simultaneously
-  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q1_curr = q1, q1_prop, q2_curr = q2, q2_prop, k_curr = k, k_prop;
+  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q1_curr = q1, q2_curr = q2, k_curr = k, k_prop;
   double lpost_curr = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2), lpost_prop, log_alpha;
-  NumericMatrix par_mat(N, 6);
-  NumericVector lpost_vec(N), log_u(5);
+  NumericMatrix par_mat(N, 5);
+  NumericVector lpost_vec(N), log_u(3), x1, x2;
   const int n = x.size();
-  const IntegerVector seqn = seq_len(k);
+  const IntegerVector indn = seq_len(n) - 1;
+  IntegerVector ind1, ind2;
   int i, j;
   RNGScope scope;
   for (i = 0; i < N * thin + burnin; i++) {
-    log_u = log(runif(5)); // for acceptance-rejection
+    log_u = log(runif(3));
     // update r1
     r1_prop = exp(rnorm(1, log(r1_curr), s_r1)[0]);
     lpost_prop = lpost_nb_rqk(r1_prop, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2);
@@ -291,33 +340,27 @@ List rwm_nb_rqk(const double r1, const double r2, const double q1, const double 
       lpost_curr = lpost_prop;
     }
     // update q1
-    q1_prop = rnorm(1, q1_curr, s_q1)[0];
-    lpost_prop = lpost_nb_rqk(r1_curr, r2_curr, q1_prop, q2_curr, k_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[2] < log_alpha) {
-      q1_curr = q1_prop;
-      lpost_curr = lpost_prop;
-    }
+    ind1 = seq_len(k_curr) - 1;
+    x1 = x[ind1];
+    q1_curr = rbeta(1, k_curr * r1_curr + 1.0, sum(x1) + 1.0)[0];
+    lpost_curr = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2);
     // update q2
-    q2_prop = rnorm(1, q2_curr, s_q2)[0];
-    lpost_prop = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_prop, k_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[3] < log_alpha) {
-      q2_curr = q2_prop;
-      lpost_curr = lpost_prop;
-    }
+    ind2 = setdiff(indn, ind1);
+    x2 = x[ind2];
+    q2_curr = rbeta(1, (n - k_curr) * r2_curr + 1.0, sum(x2) + 1.0)[0];
+    lpost_curr = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2);
     // update k
     k_prop = (int) round(rnorm(1, k_curr + 0.0, s_k)[0]);
     lpost_prop = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_prop, x, a1, b1, a2, b2);
     log_alpha = lpost_prop - lpost_curr;
-    if (log_u[4] < log_alpha) {
+    if (log_u[2] < log_alpha) {
       k_curr = k_prop;
       lpost_curr = lpost_prop;
     }
     // save for output
     if (i >= burnin && (i - burnin + 1) % thin == 0) {
       j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q1_curr, q2_curr, k_curr, lpost_curr);
+      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q1_curr, q2_curr, k_curr);
       lpost_vec[j] = lpost_curr;
     }
   }
@@ -405,4 +448,87 @@ const double lpost_nb_rkqk(const double r1, const double r2, const double q1, co
     lpost = -INFINITY;
   }
   return lpost;
+}
+
+// [[Rcpp::export]]
+List rwm_nb_rkqk(const double r1, const double r2, const double q1, const double q2, const int kr, const int kq, const NumericVector x, const double s_r1, const double s_r2, const double s_kr, const double s_kq, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
+  // componentwise RWM of NB model w/ chgpt in r & q separately
+  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q1_curr = q1, q2_curr = q2, kr_curr = kr, kr_prop, kq_curr = kq, kq_prop;
+  double lpost_curr = lpost_nb_rkqk(r1, r2, q1, q2, kr, kq, x, a1, b1, a2, b2), lpost_prop, log_alpha, aq1, aq2;
+  NumericMatrix par_mat(N, 6);
+  NumericVector lpost_vec(N), log_u(4), x1, x2, x3;
+  const int n = x.size();
+  const IntegerVector indn = seq_len(n) - 1;
+  IntegerVector ind1, ind2, ind3;
+  int i, j;
+  RNGScope scope;
+  for (i = 0; i < N * thin + burnin; i++) {
+    log_u = log(runif(4));
+    // update r1
+    r1_prop = exp(rnorm(1, log(r1_curr), s_r1)[0]);
+    lpost_prop = lpost_nb_rkqk(r1_prop, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
+    log_alpha = lpost_prop - lpost_curr + log(r1_prop) - log(r1_curr);
+    if (log_u[0] < log_alpha) {
+      r1_curr = r1_prop;
+      lpost_curr = lpost_prop;
+    }
+    // update r2
+    r2_prop = exp(rnorm(1, log(r2_curr), s_r2)[0]);
+    lpost_prop = lpost_nb_rkqk(r1_curr, r2_prop, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
+    log_alpha = lpost_prop - lpost_curr + log(r2_prop) - log(r2_curr);
+    if (log_u[1] < log_alpha) {
+      r2_curr = r2_prop;
+      lpost_curr = lpost_prop;
+    }
+    // update q1
+    ind1 = seq_len(kq_curr) - 1;
+    x1 = x[ind1];
+    if (kr_curr <= kq_curr) {
+      aq1 = kr_curr * r1_curr + (kq_curr - kr_curr) * r2_curr + 1.0;
+    }
+    else {
+      aq1 = kq_curr * r1_curr + 1.0;
+    }
+    q1_curr = rbeta(1, aq1, sum(x1) + 1.0)[0];
+    lpost_curr = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
+    // update q2
+    ind2 = setdiff(indn, ind1);
+    x2 = x[ind2];
+    if (kr_curr <= kq_curr) {
+      aq2 = (n - kq_curr) * r2_curr + 1.0;
+    }
+    else {
+      aq2 = (kr_curr - kq_curr) * r1_curr + (n - kr_curr) * r2_curr + 1.0;
+    }
+    q2_curr = rbeta(1, aq2, sum(x2) + 1.0)[0];
+    lpost_curr = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
+    // update kr
+    kr_prop = (int) round(rnorm(1, kr_curr + 0.0, s_kr)[0]);
+    lpost_prop = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_prop, kq_curr, x, a1, b1, a2, b2);
+    log_alpha = lpost_prop - lpost_curr;
+    if (log_u[2] < log_alpha) {
+      kr_curr = kr_prop;
+      lpost_curr = lpost_prop;
+    }
+    // update kq
+    kq_prop = (int) round(rnorm(1, kq_curr + 0.0, s_kq)[0]);
+    lpost_prop = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_prop, x, a1, b1, a2, b2);
+    log_alpha = lpost_prop - lpost_curr;
+    if (log_u[3] < log_alpha) {
+      kq_curr = kq_prop;
+      lpost_curr = lpost_prop;
+    }
+    // save for output
+    if (i >= burnin && (i - burnin + 1) % thin == 0) {
+      j = (i - burnin + 1) / thin - 1;
+      Rcout << j + 1 << endl;
+      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr);
+      lpost_vec[j] = lpost_curr;
+    }
+  }
+  // return
+  List L;
+  L["par"] = par_mat;
+  L["lpost"] = lpost_vec;
+  return L;
 }
