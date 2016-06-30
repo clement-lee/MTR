@@ -195,4 +195,4 @@ if (FALSE) {
 
 
 ### chgpt in r & q separately, Bayesian method
-system.time(rwm0.rkqk <- rwm_nb_rkqk(2.5, 0.9, 0.2, 0.2, 500, 500, df0.days$all, 0.375, 0.375, 300, 300, 2e+4, 100, 1e+5)) # ~0.00567s per iteration (no thinning)
+system.time(rwm0.rkqk <- rwm_nb_rkqk(2.5, 0.9, 0.2, 0.2, 500, 500, df0.days$all, 0.375, 0.375, 300, 300, 2e+4, 100, 1e+5)) # ~0.06s per 11 iterations (no thinning)

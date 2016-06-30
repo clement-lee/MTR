@@ -532,3 +532,42 @@ List rwm_nb_rkqk(const double r1, const double r2, const double q1, const double
   L["lpost"] = lpost_vec;
   return L;
 }
+
+// [[Rcpp::export]]
+const double llik_nb_rqk12(const double r1, const double r2, const double r3, const double q1, const double q2, const double q3, const int k1, const int k2, const NumericVector x) {
+  // log-likelihood of NB model w/ 2 chgpts, both in r & q simultaneously
+  const int n = x.size();
+  double llik;
+  NumericVector r = NumericVector::create(r1, r2, r3), q = NumericVector::create(q1, q2, q3);
+  IntegerVector k = IntegerVector::create(k1, k2);
+  if (is_true(any(r <= 0.0)) || is_true(any(q <= 0.0)) || is_true(any(q > 1.0)) || is_true(any(k < 1)) || is_true(any(k > n)) || k1 >= k2) {
+    llik = -INFINITY;
+  }
+  else if (k2 == n) {
+    // 1 chgpt
+    llik = llik_nb_rqk(r1, r2, q1, q2, k1, x);
+  }
+  else {
+    // k2 less than n, k1 less than k2
+    IntegerVector ind1 = seq_len(k1) - 1,
+      ind2 = seq_len(k2) - 1,
+      ind3 = seq_len(n) - 1,
+      ind4 = setdiff(ind2, ind1),
+      ind5 = setdiff(ind3, ind2);
+    NumericVector x1 = x[ind1], x2 = x[ind4], x3 = x[ind5];
+    llik = sum(dnbinom(x1, r1, q1, true)) + sum(dnbinom(x2, r2, q2, true)) + sum(dnbinom(x3, r3, q3, true));
+  }
+  return llik;
+}
+
+// [[Rcpp::export]]
+const double lpost_nb_rqk12(const double r1, const double r2, const double r3, const double q1, const double q2, const double q3, const int k1, const int k2, const int k3, const NumericVector x, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01, const double a3 = 0.01, const double b3 = 0.01) {
+  // log-posterior of NB model w/ 2 chgpts, both in r & q simultaneously
+  double lpost = llik_nb_rqk12(r1, r2, r3, q1, q2, q3, k1, k2, x) + dgamma(NumericVector::create(r1), a1, 1.0 / b1, true)[0] + dgamma(NumericVector::create(r2), a2, 1.0 / b2, true)[0] + dgamma(NumericVector::create(r3), a3, 1.0 / b3, true)[0];
+  // add joint prior of k1 & k2?
+  if (lpost != lpost) {
+    lpost = -INFINITY;
+  }
+  return lpost;
+}
+
