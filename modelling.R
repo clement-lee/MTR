@@ -1,6 +1,7 @@
 remove(list = ls())
 source("extraction.R") # run the whole script
 library(Rcpp)
+library(RcppArmadillo)
 sourceCpp("mtr.cpp") # load required llik() functions etc.
 optim.ctrl <- list(fnscale = -1, reltol = 1e-10, maxit = 5000)
 
