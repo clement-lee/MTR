@@ -665,14 +665,15 @@ List rwm_nb_rqk12(const double r1, const double r2, const double r3, const doubl
 }
 
 // [[Rcpp::export]]
-List gibbs_p_lamk(const double lam1, const double lam2, const int k, const NumericVector x, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
+const NumericMatrix gibbs_p_lamk(const double lam1, const double lam2, const int k, const NumericVector x, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
   const int n = x.size();
   double lam1_curr = lam1, lam2_curr = lam2;
   int k_curr = k;
   NumericMatrix par_mat(N, 3);
-  const IntegerVector indn = seq_len(n) - 1, seq_k = seq_len(n);
+  const IntegerVector indn = seq_len(n) - 1, seq_k = seq_len(n - 1);
   IntegerVector ind1, ind2;
-  NumericVector x1, x2, cx = cumsum(x), seq_unscaled(n), seq_scaled(n), exponent(n);
+  NumericVector x1, x2, cx = cumsum(x), exponent(n - 1), seq_unscaled(n - 1), seq_scaled(n - 1);
+  cx = cx[seq_k - 1];
   int i, j;
   RNGScope scope;
   for (i = 0; i < N * thin + burnin; i++) {
@@ -690,13 +691,11 @@ List gibbs_p_lamk(const double lam1, const double lam2, const int k, const Numer
     if (i >= burnin && (i - burnin + 1) % thin == 0) {
       j = (i - burnin + 1) / thin - 1;
       par_mat(j, _) = NumericVector::create(lam1_curr, lam2_curr, (double) k_curr);
-      //      if ((j + 1) % 100 == 0) {
-      //        Rcout << j + 1 << endl;
-      //      }
+      if ((j + 1) % 100 == 0) {
+        Rcout << j + 1 << endl;
+      }
     }
   }
-  List L;
-  L["par"] = par_mat;
-  return L;
+  return par_mat;
 }
 

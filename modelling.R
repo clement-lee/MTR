@@ -172,6 +172,11 @@ df0.rqk <- l0.rqk %>%
 ### chgpt in r & q simultaneously, Bayesian method
 system.time(rwm0.rqk <- rwm_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, df0.days$all, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.004s / iteration (no thinning)
 
+### pred. dist. for daily count
+l0.pred <- sapply(0:6, dnbinom_rqk, rwm0.rqk$par[,1], rwm0.rqk$par[,2], rwm0.rqk$par[,3], rwm0.rqk$par[,4], rwm0.rqk$par[,5], n0.days, simplify = F) # daily
+v0.pred <- sapply(l0.pred, mean) # combine with existing data_frames?
+## have to think about how to work out weekly numbers
+
 
 
 ### chgpt in r & q separately, likelihood method
@@ -197,3 +202,15 @@ if (FALSE) {
 
 ### chgpt in r & q separately, Bayesian method
 system.time(rwm0.rkqk <- rwm_nb_rkqk(2.5, 0.9, 0.2, 0.2, 500, 500, df0.days$all, 0.375, 0.375, 300, 300, 2e+4, 100, 1e+5)) # ~0.06s per 11 iterations (no thinning)
+
+
+
+### chgpt in lambda, Bayesian method
+set.seed(123)
+system.time(m0.lam <- gibbs_p_lamk(0.5, 0.5, 500, df0.days$all, 1e+4, 100, 2e+4))
+
+
+
+
+
+

@@ -181,7 +181,8 @@ interpose_good_service <- function(df) {
     bind_rows(df2, df3)
 }
 
-
-
-
+dnbinom_rqk <- function(x, r1, r2, q1, q2, k, n) {
+    ## pmf of incident count in 1-chgpt model, in r & q simultaneously; vectorised over all model pars
+    dnbinom(x, r1, q1) * k / n + dnbinom(x, r2, q2) * (n - k) /n
+}
 
