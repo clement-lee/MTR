@@ -8,14 +8,15 @@ optim.ctrl <- list(fnscale = -1, reltol = 1e-10, maxit = 5000)
 
 
 ### fitting Poisson & negative Binomial model
-mle.p <- df0.days$all %>% mean # sample mean = MLE of lambda, no numerical computing required
-obj0.nb <- optim(c(3/7, 0.5), llik_nb, x = df0.days$all, control = optim.ctrl)
+x <- df0.days$all
+mle.p <- x %>% mean # sample mean = MLE of lambda, no numerical computing required
+obj0.nb <- optim(c(3/7, 0.5), llik_nb, x = x, control = optim.ctrl)
 mle.nb <- obj0.nb$par
 
 
 
 ### counts of count i.e. no. of days w/ a particular number of incidents
-df0.counts <- seq(0, df0.days$all %>% max) %>%
+df0.counts <- seq(0, x %>% max) %>%
     data_frame(count = .) %>%
     ## i) all
     left_join(df0.days %>% count(all), by = c("count" = "all")) %>% 
@@ -47,10 +48,10 @@ df0.counts <- seq(0, df0.days$all %>% max) %>%
 
 
 ### linear trend model
-t0 <- seq_along(df0.days$all)
-obj0.nb.rt <- optim(c(mle.nb, 1e-5), llik_nb_rt, x = df0.days$all, t = t0, control = optim.ctrl)
+t0 <- seq_along(x)
+obj0.nb.rt <- optim(c(mle.nb, 1e-5), llik_nb_rt, x = x, t = t0, control = optim.ctrl)
 mle.nb.rt <- obj0.nb.rt$par
-obj0.nb.qt <- optim(c(mle.nb, 1e-5), llik_nb_qt, x = df0.days$all, t = t0, control = optim.ctrl)
+obj0.nb.qt <- optim(c(mle.nb, 1e-5), llik_nb_qt, x = x, t = t0, control = optim.ctrl)
 mle.nb.qt <- obj0.nb.qt$par
 
 
@@ -80,7 +81,7 @@ l0.rk <- list()
 for (i in seq_along(t0)) {
     print(i)
     par0.rk <- c(mle.nb[1], mle.nb[1], mle.nb[2])
-    obj0.rk <- optim(par0.rk, llik_nb_rk_fix_k, x = df0.days$all, k = i, control = optim.ctrl)
+    obj0.rk <- optim(par0.rk, llik_nb_rk_fix_k, x = x, k = i, control = optim.ctrl)
     l0.rk[[i]] <- data_frame(
         llik = obj0.rk$value,
         r1 = obj0.rk$par[1],
@@ -103,7 +104,7 @@ df0.rk <- l0.rk %>%
 
 
 ### chgpt in r, Bayesian method
-system.time(rwm0.rk <- rwm_nb_rk(2.5, 0.9, 0.2, 100, df0.days$all, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.01s / 3 iterations (no thinning)
+system.time(rwm0.rk <- rwm_nb_rk(2.5, 0.9, 0.2, 100, x, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.01s / 3 iterations (no thinning)
 
 
 
@@ -112,7 +113,7 @@ l0.qk <- list()
 for (i in seq_along(t0)) {
     print(i)
     par0.qk <- c(mle.nb[1], mle.nb[2], mle.nb[2])
-    obj0.qk <- optim(par0.qk, llik_nb_qk_fix_k, x = df0.days$all, k = i, control = optim.ctrl)
+    obj0.qk <- optim(par0.qk, llik_nb_qk_fix_k, x = x, k = i, control = optim.ctrl)
     l0.qk[[i]] <- data_frame(
         llik = obj0.qk$value,
         r = obj0.qk$par[1],
@@ -135,7 +136,7 @@ df0.qk <- l0.qk %>%
 
 
 ### chgpt in q, Bayesian method
-system.time(rwm0.qk <- rwm_nb_qk(0.9, 0.2, 0.2, 100, df0.days$all, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.01s / 3 iterations (no thinning)
+system.time(rwm0.qk <- rwm_nb_qk(0.9, 0.2, 0.2, 100, x, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.01s / 3 iterations (no thinning)
 
 
 
@@ -144,7 +145,7 @@ l0.rqk <- list()
 for (i in seq_along(t0)) {
     print(i)
     par0.rqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
-    obj0.rqk <- optim(par0.rqk, llik_nb_rqk_fix_k, x = df0.days$all, k = i, control = optim.ctrl)
+    obj0.rqk <- optim(par0.rqk, llik_nb_rqk_fix_k, x = x, k = i, control = optim.ctrl)
     l0.rqk[[i]] <- data_frame(
         llik = obj0.rqk$value,
         r1 = obj0.rqk$par[1],
@@ -170,11 +171,11 @@ df0.rqk <- l0.rqk %>%
 
 
 ### chgpt in r & q simultaneously, Bayesian method
-system.time(rwm0.rqk <- rwm_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, df0.days$all, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.004s / iteration (no thinning)
+system.time(rwm0.rqk <- rwm_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.004s / iteration (no thinning)
 
 ### pred. dist. for daily count
-l0.pred <- sapply(0:6, dnbinom_rqk, rwm0.rqk$par[,1], rwm0.rqk$par[,2], rwm0.rqk$par[,3], rwm0.rqk$par[,4], rwm0.rqk$par[,5], n0.days, simplify = F) # daily
-v0.pred <- sapply(l0.pred, mean) # combine with existing data_frames?
+l0.pred.rqk <- sapply(0:6, dnbinom_rqk, rwm0.rqk$par[,1], rwm0.rqk$par[,2], rwm0.rqk$par[,3], rwm0.rqk$par[,4], rwm0.rqk$par[,5], n0.days, simplify = F) # daily
+v0.pred.rqk <- sapply(l0.pred, mean) # combine with existing data_frames?
 ## have to think about how to work out weekly numbers
 
 
@@ -188,7 +189,7 @@ if (FALSE) {
         for (j in seq_along(t0)) {
             print(c(i, j))
             par0.rkqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
-            obj0.rkqk <- optim(par0.rkqk, llik_nb_rkqk_fix_k, x = df0.days$all, kr = i, kq = j, control = optim.ctrl)
+            obj0.rkqk <- optim(par0.rkqk, llik_nb_rkqk_fix_k, x = x, kr = i, kq = j, control = optim.ctrl)
             r1.rkqk[i, j] <- obj0.rkqk$par[1]
             r2.rkqk[i, j] <- obj0.rkqk$par[2]
             q1.rkqk[i, j] <- obj0.rkqk$par[3]
@@ -201,16 +202,18 @@ if (FALSE) {
 
 
 ### chgpt in r & q separately, Bayesian method
-system.time(rwm0.rkqk <- rwm_nb_rkqk(2.5, 0.9, 0.2, 0.2, 500, 500, df0.days$all, 0.375, 0.375, 300, 300, 2e+4, 100, 1e+5)) # ~0.06s per 11 iterations (no thinning)
+system.time(rwm0.rkqk <- rwm_nb_rkqk(2.5, 0.9, 0.2, 0.2, 500, 500, x, 0.375, 0.375, 300, 300, 2e+4, 100, 1e+5)) # ~0.06s per 11 iterations (no thinning)
 
 
 
 ### chgpt in lambda, Bayesian method
 set.seed(123)
-system.time(m0.lam <- gibbs_p_lamk(0.5, 0.5, 500, df0.days$all, 1e+4, 100, 2e+4))
+system.time(m0.lam <- gibbs_p_lamk(0.5, 0.5, 500, x, 1e+4, 100, 2e+4))
 
 
 
-
+### 2 chgpts in r & q simultaneously, Bayesian method
+set.seed(234)
+system.time(rwm0.rqk12 <- rwm_nb_rqk12(2.5, 0.9, 1.5, 0.2, 0.3, 0.4, 100, 1000, x, 0.375, 0.75, 0.4, 30, 30, 5e+5, 1, 2e+4)) 
 
 
