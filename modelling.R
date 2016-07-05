@@ -171,7 +171,10 @@ df0.rqk <- l0.rqk %>%
 
 
 ### chgpt in r & q simultaneously, Bayesian method
-system.time(rwm0.rqk <- rwm_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.375, 0.375, 200, 2e+4, 10, 5e+4)) # ~0.004s / iteration (no thinning)
+system.time(rwm0.rqk <- rwm_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.375, 0.375, 400, 2e+4, 10, 5e+4)) # ~0.004s / iteration (no thinning)
+
+system.time(mwg0.lamk <- mwg_nb_lamk(2.5, 0.9, 0.15, 0.15, 100, x, 0.375, 0.375, 2e+4, 10, 5e+4)) # ~0.0004s / iteration (no thinning)
+
 
 ### pred. dist. for daily count
 l0.pred.rqk <- sapply(0:6, dnbinom_rqk, rwm0.rqk$par[,1], rwm0.rqk$par[,2], rwm0.rqk$par[,3], rwm0.rqk$par[,4], rwm0.rqk$par[,5], n0.days, simplify = F) # daily
@@ -214,6 +217,6 @@ system.time(m0.lam <- gibbs_p_lamk(0.5, 0.5, 500, x, 1e+4, 100, 2e+4))
 
 ### 2 chgpts in r & q simultaneously, Bayesian method
 set.seed(234)
-system.time(rwm0.rqk12 <- rwm_nb_rqk12(2.5, 0.9, 1.5, 0.2, 0.3, 0.4, 100, 1000, x, 0.375, 0.75, 0.4, 30, 30, 5e+5, 1, 2e+4)) 
+system.time(rwm0.rqk12 <- rwm_nb_rqk12(1.46, 0.31, 3.32, 0.80, 0.67, 0.91, 690, 740, x, 0.5, 0.75, 0.5, 60, 60, 0.5, 5e+5, 1, 2e+4))
 
 
