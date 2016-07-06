@@ -74,193 +74,6 @@ const double llik_nb_qt(const NumericVector par, const NumericVector x, const Nu
 }
 
 // [[Rcpp::export]]
-const double llik_nb_rk(const double r1, const double r2, const double q, const int k, const NumericVector x) {
-  // log-likelihood of NB model w/ chgpt in r (size)
-  const int n = x.size();
-  double llik;
-  if (r1 <= 0.0 || r2 <= 0.0 || q <= 0.0 || q > 1.0 || k < 1 || k >= n) {
-    llik = -INFINITY;
-  }
-  else {
-    // a chgpt less than n
-    IntegerVector indn = seq_len(n) - 1,
-      ind1 = seq_len(k) - 1,
-      ind2 = setdiff(indn, ind1);
-    NumericVector x1 = x[ind1], x2 = x[ind2];
-    llik = sum(dnbinom(x1, r1, q, true)) + sum(dnbinom(x2, r2, q, true));
-  }
-  return llik;
-}
-
-// [[Rcpp::export]]
-const double llik_nb_rk_fix_k(const NumericVector par, const int k, const NumericVector x) {
-  // wrapper of llik_nb_rk() for optim() w/ fixed k
-  if (par.size() != 3) {
-    stop("par has to be of length 3.");
-  }
-  const double llik = llik_nb_rk(par[0], par[1], par[2], k, x);
-  return llik;
-}
-
-// [[Rcpp::export]]
-const double lpost_nb_rk(const double r1, const double r2, const double q, const int k, const NumericVector x, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
-  // log-posterior of NB model w/ chgpt in r (size)
-  double lpost = llik_nb_rk(r1, r2, q, k, x) + dgamma(NumericVector::create(r1), a1, 1.0 / b1, true)[0] + dgamma(NumericVector::create(r2), a2, 1.0 / b2, true)[0];
-  // uniform priors for q & k won't matter
-  if (lpost != lpost) { // NaN
-    // this happens when r is outside support
-    lpost = -INFINITY;
-  }
-  return lpost;
-}
-
-// [[Rcpp::export]]
-List rwm_nb_rk(const double r1, const double r2, const double q, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
-  // componentwise RWM of NB model w/ chgpt in r (size)
-  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q_curr = q, k_curr = k, k_prop;
-  double lpost_curr = lpost_nb_rk(r1_curr, r2_curr, q_curr, k_curr, x, a1, b1, a2, b2), lpost_prop, log_alpha;
-  NumericMatrix par_mat(N, 4);
-  NumericVector lpost_vec(N), log_u(3);
-  const int n = x.size();
-  int i, j;
-  RNGScope scope;
-  for (i = 0; i < N * thin + burnin; i++) {
-    log_u = log(runif(3)); // for acceptance-rejection
-    // update r1
-    r1_prop = exp(rnorm(1, log(r1_curr), s_r1)[0]);
-    lpost_prop = lpost_nb_rk(r1_prop, r2_curr, q_curr, k_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr + log(r1_prop) - log(r1_curr);
-    if (log_u[0] < log_alpha) {
-      r1_curr = r1_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update r2
-    r2_prop = exp(rnorm(1, log(r2_curr), s_r2)[0]);
-    lpost_prop = lpost_nb_rk(r1_curr, r2_prop, q_curr, k_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr + log(r2_prop) - log(r2_curr);
-    if (log_u[1] < log_alpha) {
-      r2_curr = r2_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update q
-    q_curr = rbeta(1, k_curr * r1_curr + (n - k_curr) * r2_curr + 1.0, sum(x) + 1.0)[0];
-    lpost_curr = lpost_nb_rk(r1_curr, r2_curr, q_curr, k_curr, x, a1, b1, a2, b2);
-    // update k
-    k_prop = (int) round(rnorm(1, k_curr + 0.0, s_k)[0]);
-    lpost_prop = lpost_nb_rk(r1_curr, r2_curr, q_curr, k_prop, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[2] < log_alpha) {
-      k_curr = k_prop;
-      lpost_curr = lpost_prop;
-    }
-    // save for output
-    if (i >= burnin && (i - burnin + 1) % thin == 0) {
-      j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q_curr, k_curr);
-      lpost_vec[j] = lpost_curr;
-    }
-  }
-  // return
-  List L;
-  L["par"] = par_mat;
-  L["lpost"] = lpost_vec;
-  return L;
-}  
-
-// [[Rcpp::export]]
-const double llik_nb_qk(const double r, const double q1, const double q2, const int k, const NumericVector x) {
-  // log-likelihood of NB model w/ chgpt in q (prob)
-  const int n = x.size();
-  double llik;
-  if (r <= 0.0 || q1 <= 0.0 || q1 > 1.0 || q2 <= 0.0 || q2 > 1.0 || k < 1 || k >= n) {
-    llik = -INFINITY;
-  }
-  else {
-    // a chgpt less than n
-    IntegerVector indn = seq_len(n) - 1,
-      ind1 = seq_len(k) - 1,
-      ind2 = setdiff(indn, ind1);
-    NumericVector x1 = x[ind1], x2 = x[ind2];
-    llik = sum(dnbinom(x1, r, q1, true)) + sum(dnbinom(x2, r, q2, true));
-  }
-  return llik;
-}
-
-// [[Rcpp::export]]
-const double llik_nb_qk_fix_k(const NumericVector par, const int k, const NumericVector x) {
-  // wrapper of llik_nb_qk() for optim() w/ fixed k
-  if (par.size() != 3) {
-    stop("par has to be of length 3.");
-  }
-  const double llik = llik_nb_qk(par[0], par[1], par[2], k, x);
-  return llik;
-}
-
-// [[Rcpp::export]]
-const double lpost_nb_qk(const double r, const double q1, const double q2, const int k, const NumericVector x, const double a = 0.01, const double b = 0.01) {
-  // log-posterior of NB model w/ chgpt in q (prob)
-  double lpost = llik_nb_qk(r, q1, q2, k, x) + dgamma(NumericVector::create(r), a, 1.0 / b, true)[0];
-  if (lpost != lpost) {
-    lpost = -INFINITY;
-  }
-  return lpost;
-}
-
-// [[Rcpp::export]]
-List rwm_nb_qk(const double r, const double q1, const double q2, const int k, const NumericVector x, const double s_r, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a = 0.01, const double b = 0.01) {
-  // componentwise RWM of NB model w/ chgpt in q (prob)
-  double r_curr = r, r_prop, q1_curr = q1, q2_curr = q2, k_curr = k, k_prop;
-  double lpost_curr = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_curr, x, a, b), lpost_prop, log_alpha;
-  NumericMatrix par_mat(N, 4);
-  NumericVector lpost_vec(N), log_u(2), x1, x2;
-  const int n = x.size();
-  const IntegerVector indn = seq_len(n) - 1;
-  IntegerVector ind1, ind2;
-  int i, j;
-  RNGScope scope;
-  for (i = 0; i < N * thin + burnin; i++) {
-    log_u = log(runif(2));
-    // update r
-    r_prop = exp(rnorm(1, log(r_curr), s_r)[0]);
-    lpost_prop = lpost_nb_qk(r_prop, q1_curr, q2_curr, k_curr, x, a, b);
-    log_alpha = lpost_prop - lpost_curr + log(r_prop) - log(r_curr);
-    if (log_u[0] < log_alpha) {
-      r_curr = r_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update q1
-    ind1 = seq_len(k_curr) - 1;
-    x1 = x[ind1];
-    q1_curr = rbeta(1, k_curr * r_curr + 1.0, sum(x1) + 1.0)[0];
-    lpost_curr = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_curr, x, a, b);
-    // update q2
-    ind2 = setdiff(indn, ind1);
-    x2 = x[ind2];
-    q2_curr = rbeta(1, (n - k_curr) * r_curr + 1.0, sum(x2) + 1.0)[0];
-    lpost_curr = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_curr, x, a, b);
-    // update k
-    k_prop = (int) round(rnorm(1, k_curr + 0.0, s_k)[0]);
-    lpost_prop = lpost_nb_qk(r_curr, q1_curr, q2_curr, k_prop, x, a, b);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[1] < log_alpha) {
-      k_curr = k_prop;
-      lpost_curr = lpost_prop;
-    }
-    // save for output
-    if (i >= burnin && (i - burnin + 1) % thin == 0) {
-      j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(r_curr, q1_curr, q2_curr, k_curr);
-      lpost_vec[j] = lpost_curr;
-    }
-  }
-  // return
-  List L;
-  L["par"] = par_mat;
-  L["lpost"] = lpost_vec;
-  return L;
-}
-
-// [[Rcpp::export]]
 const double llik_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x) {
   // log-likelihood of NB model w/ chgpt in r & q simultaneously
   const int n = x.size();
@@ -297,339 +110,6 @@ const double lpost_nb_rqk(const double r1, const double r2, const double q1, con
     lpost = -INFINITY;
   }
   return lpost;
-}
-
-// [[Rcpp::export]]
-List rwm_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_k, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
-  // componentwise RWM of NB model w/ chgpt in r & q simultaneously
-  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q1_curr = q1, q2_curr = q2, k_curr = k, k_prop;
-  double lpost_curr = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2), lpost_prop, log_alpha;
-  NumericMatrix par_mat(N, 5);
-  NumericVector lpost_vec(N), log_u(3), x1, x2;
-  const int n = x.size();
-  const IntegerVector indn = seq_len(n) - 1;
-  IntegerVector ind1, ind2;
-  int i, j;
-  RNGScope scope;
-  for (i = 0; i < N * thin + burnin; i++) {
-    log_u = log(runif(3));
-    // update r1
-    r1_prop = exp(rnorm(1, log(r1_curr), s_r1)[0]);
-    lpost_prop = lpost_nb_rqk(r1_prop, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr + log(r1_prop) - log(r1_curr);
-    if (log_u[0] < log_alpha) {
-      r1_curr = r1_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update r2
-    r2_prop = exp(rnorm(1, log(r2_curr), s_r2)[0]);
-    lpost_prop = lpost_nb_rqk(r1_curr, r2_prop, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr + log(r2_prop) - log(r2_curr);
-    if (log_u[1] < log_alpha) {
-      r2_curr = r2_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update q1
-    ind1 = seq_len(k_curr) - 1;
-    x1 = x[ind1];
-    q1_curr = rbeta(1, k_curr * r1_curr + 1.0, sum(x1) + 1.0)[0];
-    lpost_curr = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2);
-    // update q2
-    ind2 = setdiff(indn, ind1);
-    x2 = x[ind2];
-    q2_curr = rbeta(1, (n - k_curr) * r2_curr + 1.0, sum(x2) + 1.0)[0];
-    lpost_curr = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_curr, x, a1, b1, a2, b2);
-    // update k
-    k_prop = (int) round(rnorm(1, k_curr + 0.0, s_k)[0]);
-    lpost_prop = lpost_nb_rqk(r1_curr, r2_curr, q1_curr, q2_curr, k_prop, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[2] < log_alpha) {
-      k_curr = k_prop;
-      lpost_curr = lpost_prop;
-    }
-    // save for output
-    if (i >= burnin && (i - burnin + 1) % thin == 0) {
-      j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q1_curr, q2_curr, k_curr);
-      lpost_vec[j] = lpost_curr;
-      if ((j + 1) % 100 == 0) {
-        Rcout << j + 1 << endl;
-      }
-    }
-  }
-  // return
-  List L;
-  L["par"] = par_mat;
-  L["lpost"] = lpost_vec;
-  return L;
-}  
-
-// [[Rcpp::export]]
-const double llik_nb_rkqk(const double r1, const double r2, const double q1, const double q2, const double kr, const double kq, const NumericVector x) {
-  // log-likelihood of NB model w/ chgpt in r & q separately
-  const int n = x.size();
-  double llik;
-  if (r1 <= 0.0 || r2 <= 0.0 || q1 <= 0.0 || q1 > 1.0 || q2 <= 0.0 || q2 > 1.0 || kr < 1 || kr >= n || kq < 1 || kq >= n) {
-    llik = -INFINITY;
-  }
-  else if (kr == kq) {
-    // both chgpts coincide and are less than n
-    llik = llik_nb_rqk(r1, r2, q1, q2, kr, x);
-  }
-  else if (kr < kq) {
-    // chgpt for r before chgpt for q, both chgpts smaller than n
-    IntegerVector ind1 = seq_len(kr) - 1,
-      ind2 = seq_len(kq) - 1,
-      ind3 = seq_len(n) - 1,
-      ind4 = setdiff(ind2, ind1),
-      ind5 = setdiff(ind3, ind2);
-    NumericVector x1 = x[ind1], x2 = x[ind4], x3 = x[ind5];
-    llik = sum(dnbinom(x1, r1, q1, true)) + sum(dnbinom(x2, r2, q1, true)) + sum(dnbinom(x3, r2, q2, true));
-  }
-  else if (kr > kq) {
-    // chgpt for q before chgpt for r, both chgpts smaller than n
-    IntegerVector ind1 = seq_len(kq) - 1,
-      ind2 = seq_len(kr) - 1,
-      ind3 = seq_len(n) - 1,
-      ind4 = setdiff(ind2, ind1),
-      ind5 = setdiff(ind3, ind2);
-    NumericVector x1 = x[ind1], x2 = x[ind4], x3 = x[ind5];
-    llik = sum(dnbinom(x1, r1, q1, true)) + sum(dnbinom(x2, r1, q2, true)) + sum(dnbinom(x3, r2, q2, true));
-  }
-  return llik;
-}
-
-// [[Rcpp::export]]
-const double llik_nb_rkqk_fix_k(const NumericVector par, const int kr, const int kq, const NumericVector x) {
-  // wrapper of llik_nb_rkqk() for optim() w/ fixed kr & kq
-  if (par.size() != 4) {
-    stop("par has to be of length 4.");
-  }
-  const double llik = llik_nb_rkqk(par[0], par[1], par[2], par[3], kr, kq, x);
-  return llik;
-}
-
-// [[Rcpp::export]]
-const double lpost_nb_rkqk(const double r1, const double r2, const double q1, const double q2, const int kr, const int kq, const NumericVector x, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
-  // log-likelihood of NB model w/ chgpt in r & q separately
-  double lpost = llik_nb_rkqk(r1, r2, q1, q2, kr, kq, x) + dgamma(NumericVector::create(r1), a1, 1.0 / b1, true)[0] + dgamma(NumericVector::create(r2), a2, 1.0 / b2, true)[0];
-  if (lpost != lpost) {
-    lpost = -INFINITY;
-  }
-  return lpost;
-}
-
-// [[Rcpp::export]]
-List rwm_nb_rkqk(const double r1, const double r2, const double q1, const double q2, const int kr, const int kq, const NumericVector x, const double s_r1, const double s_r2, const double s_kr, const double s_kq, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
-  // componentwise RWM of NB model w/ chgpt in r & q separately
-  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q1_curr = q1, q2_curr = q2, kr_curr = kr, kr_prop, kq_curr = kq, kq_prop;
-  double lpost_curr = lpost_nb_rkqk(r1, r2, q1, q2, kr, kq, x, a1, b1, a2, b2), lpost_prop, log_alpha, aq1, aq2;
-  NumericMatrix par_mat(N, 6);
-  NumericVector lpost_vec(N), log_u(4), x1, x2, x3;
-  const int n = x.size();
-  const IntegerVector indn = seq_len(n) - 1;
-  IntegerVector ind1, ind2, ind3;
-  int i, j;
-  RNGScope scope;
-  for (i = 0; i < N * thin + burnin; i++) {
-    log_u = log(runif(4));
-    // update r1
-    r1_prop = exp(rnorm(1, log(r1_curr), s_r1)[0]);
-    lpost_prop = lpost_nb_rkqk(r1_prop, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr + log(r1_prop) - log(r1_curr);
-    if (log_u[0] < log_alpha) {
-      r1_curr = r1_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update r2
-    r2_prop = exp(rnorm(1, log(r2_curr), s_r2)[0]);
-    lpost_prop = lpost_nb_rkqk(r1_curr, r2_prop, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr + log(r2_prop) - log(r2_curr);
-    if (log_u[1] < log_alpha) {
-      r2_curr = r2_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update q1
-    ind1 = seq_len(kq_curr) - 1;
-    x1 = x[ind1];
-    if (kr_curr <= kq_curr) {
-      aq1 = kr_curr * r1_curr + (kq_curr - kr_curr) * r2_curr + 1.0;
-    }
-    else {
-      aq1 = kq_curr * r1_curr + 1.0;
-    }
-    q1_curr = rbeta(1, aq1, sum(x1) + 1.0)[0];
-    lpost_curr = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
-    // update q2
-    ind2 = setdiff(indn, ind1);
-    x2 = x[ind2];
-    if (kr_curr <= kq_curr) {
-      aq2 = (n - kq_curr) * r2_curr + 1.0;
-    }
-    else {
-      aq2 = (kr_curr - kq_curr) * r1_curr + (n - kr_curr) * r2_curr + 1.0;
-    }
-    q2_curr = rbeta(1, aq2, sum(x2) + 1.0)[0];
-    lpost_curr = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr, x, a1, b1, a2, b2);
-    // update kr
-    kr_prop = (int) round(rnorm(1, kr_curr + 0.0, s_kr)[0]);
-    lpost_prop = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_prop, kq_curr, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[2] < log_alpha) {
-      kr_curr = kr_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update kq
-    kq_prop = (int) round(rnorm(1, kq_curr + 0.0, s_kq)[0]);
-    lpost_prop = lpost_nb_rkqk(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_prop, x, a1, b1, a2, b2);
-    log_alpha = lpost_prop - lpost_curr;
-    if (log_u[3] < log_alpha) {
-      kq_curr = kq_prop;
-      lpost_curr = lpost_prop;
-    }
-    // save for output
-    if (i >= burnin && (i - burnin + 1) % thin == 0) {
-      j = (i - burnin + 1) / thin - 1;
-      Rcout << j + 1 << endl;
-      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q1_curr, q2_curr, kr_curr, kq_curr);
-      lpost_vec[j] = lpost_curr;
-    }
-  }
-  // return
-  List L;
-  L["par"] = par_mat;
-  L["lpost"] = lpost_vec;
-  return L;
-}
-
-// [[Rcpp::export]]
-const double llik_nb_rqk12(const double r1, const double r2, const double r3, const double q1, const double q2, const double q3, const int k1, const int k2, const NumericVector x) {
-  // log-likelihood of NB model w/ 2 chgpts, both in r & q simultaneously
-  const int n = x.size();
-  double llik;
-  NumericVector r = NumericVector::create(r1, r2, r3), q = NumericVector::create(q1, q2, q3);
-  IntegerVector k = IntegerVector::create(k1, k2);
-  if (is_true(any(r <= 0.0)) || is_true(any(q <= 0.0)) || is_true(any(q > 1.0)) || is_true(any(k < 1)) || is_true(any(k > n)) || k1 >= k2 || k2 == n) {
-    llik = -INFINITY;
-  }
-  else {
-    // k2 less than n, k1 less than k2
-    IntegerVector ind1 = seq_len(k1) - 1,
-      ind2 = seq_len(k2) - 1,
-      ind3 = seq_len(n) - 1,
-      ind4 = setdiff(ind2, ind1),
-      ind5 = setdiff(ind3, ind2);
-    NumericVector x1 = x[ind1], x2 = x[ind4], x3 = x[ind5];
-    llik = sum(dnbinom(x1, r1, q1, true)) + sum(dnbinom(x2, r2, q2, true)) + sum(dnbinom(x3, r3, q3, true));
-  }
-  return llik;
-}
-
-// [[Rcpp::export]]
-const double lpost_nb_rqk12(const double r1, const double r2, const double r3, const double q1, const double q2, const double q3, const int k1, const int k2, const NumericVector x, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01, const double a3 = 0.01, const double b3 = 0.01) {
-  // log-posterior of NB model w/ 2 chgpts, both in r & q simultaneously
-  double lpost = llik_nb_rqk12(r1, r2, r3, q1, q2, q3, k1, k2, x) + dgamma(NumericVector::create(r1), a1, 1.0 / b1, true)[0] + dgamma(NumericVector::create(r2), a2, 1.0 / b2, true)[0] + dgamma(NumericVector::create(r3), a3, 1.0 / b3, true)[0];
-  // add joint prior of k1 & k2?
-  if (lpost != lpost) {
-    lpost = -INFINITY;
-  }
-  return lpost;
-}
-
-// [[Rcpp::export]]
-List rwm_nb_rqk12(const double r1, const double r2, const double r3, const double q1, const double q2, const double q3, const int k1, const int k2, const NumericVector x, const double s_r1, const double s_r2, const double s_r3, const double s_k1, const double s_k2, const double rho = 0.0, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01, const double a3 = 0.01, const double b3 = 0.01) {
-  // componentwise RWM of NB model w/ 2 chgpts, both in r & q simultaneously
-  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, r3_curr = r3, r3_prop, q1_curr = q1, q1_prop, q2_curr = q2, q2_prop, q3_curr = q3, q3_prop, k1_prop, k2_prop;
-  int k1_curr = k1, k2_curr = k2;
-//  int k1_curr = k1, k1_prop, k2_curr = k2, k2_prop;
-  double lpost_curr = lpost_nb_rqk12(r1_curr, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr, x, a1, b1, a2, b2, a3, b3), lpost_prop, log_alpha, aq1, aq2, aq3;
-  NumericMatrix par_mat(N, 8);
-  NumericVector lpost_vec(N), log_u(5), x1, x2, x3;
-  const int n = x.size();
-  const IntegerVector indn = seq_len(n) - 1;
-  IntegerVector ind1, ind2, ind3, ind4;
-  int i, j;
-  RNGScope scope;
-  for (i = 0; i < N * thin + burnin; i++) {
-    log_u = log(runif(5));
-    // update r1
-    r1_prop = exp(rnorm(1, log(r1_curr), s_r1)[0]);
-    lpost_prop = lpost_nb_rqk12(r1_prop, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr, x, a1, b1, a2, b2, a3, b3);
-    log_alpha = lpost_prop - lpost_curr + log(r1_prop) - log(r1_curr);
-    j = 0;
-    if (log_u[j] < log_alpha) {
-      r1_curr = r1_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update r2
-    r2_prop = exp(rnorm(1, log(r2_curr), s_r2)[0]);
-    lpost_prop = lpost_nb_rqk12(r1_curr, r2_prop, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr, x, a1, b1, a2, b2, a3, b3);
-    log_alpha = lpost_prop - lpost_curr + log(r2_prop) - log(r2_curr);
-    j++;
-    if (log_u[j] < log_alpha) {
-      r2_curr = r2_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update r3
-    r3_prop = exp(rnorm(1, log(r3_curr), s_r3)[0]);
-    lpost_prop = lpost_nb_rqk12(r1_curr, r2_curr, r3_prop, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr, x, a1, b1, a2, b2, a3, b3);
-    log_alpha = lpost_prop - lpost_curr + log(r3_prop) - log(r3_curr);
-    j++;
-    if (log_u[j] < log_alpha) {
-      r3_curr = r3_prop;
-      lpost_curr = lpost_prop;
-    }
-    // update q1
-    ind1 = seq_len(k1_curr) - 1;
-    x1 = x[ind1];
-    q1_curr = rbeta(1, (double) ind1.size() * r1_curr + 1.0, sum(x1) + 1.0)[0];
-    lpost_curr = lpost_nb_rqk12(r1_curr, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr, x, a1, b1, a2, b2, a3, b3);
-    // update q2
-    ind2 = seq_len(k2_curr) - 1;
-    ind3 = setdiff(ind2, ind1);
-    x2 = x[ind3];
-    q2_curr = rbeta(1, (double) ind3.size() * r2_curr + 1.0, sum(x2) + 1.0)[0];
-    lpost_curr = lpost_nb_rqk12(r1_curr, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr, x, a1, b1, a2, b2, a3, b3);
-    // update q3
-    ind4 = setdiff(indn, ind2);
-    x3 = x[ind4];
-    q3_curr = rbeta(1, (double) ind4.size() * r3_curr + 1.0, sum(x3) + 1.0)[0];
-    lpost_curr = lpost_nb_rqk12(r1_curr, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr, x, a1, b1, a2, b2, a3, b3);
-    // update k1 & k2 simultaneously
-    k1_prop = rnorm(1, (double) k1_curr, s_k1)[0];
-    k2_prop = rnorm(1, (double) (k2_curr + s_k2 / s_k1 * rho * (k1_prop - k1_curr)), sqrt(1.0 - rho * rho) * s_k2)[0];
-    lpost_prop = lpost_nb_rqk12(r1_curr, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, (int) round(k1_prop), (int) round(k2_prop), x, a1, b1, a2, b2, a3, b3);
-    log_alpha = lpost_prop - lpost_curr;
-    j++;
-    if (log_u[j] < log_alpha) {
-      k1_curr = (int) round(k1_prop);
-      k2_curr = (int) round(k2_prop);
-      lpost_curr = lpost_prop;
-    }
-/*    // update k2
-    k2_prop = (int) round(rnorm(1, (double) k2_curr, s_k2)[0]);
-    lpost_prop = lpost_nb_rqk12(r1_curr, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_prop, x, a1, b1, a2, b2, a3, b3);
-    log_alpha = lpost_prop - lpost_curr;
-    j++;
-    if (log_u[j] < log_alpha) {
-      k2_curr = k2_prop;
-      lpost_curr = lpost_prop;
-    } */
-    // save for output
-    if (i >= burnin && (i - burnin + 1) % thin == 0) {
-      j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, r3_curr, q1_curr, q2_curr, q3_curr, k1_curr, k2_curr);
-      lpost_vec[j] = lpost_curr;
-      if ((j + 1) % 100 == 0) {
-        Rcout << j + 1 << endl;
-      }
-    }
-  }
-  // return
-  List L;
-  L["par"] = par_mat;
-  L["lpost"] = lpost_vec;
-  return L;
 }
 
 // [[Rcpp::export]]
@@ -680,6 +160,68 @@ const NumericMatrix mwg_nb_lamk(const double r1, const double r2, const double b
     log_alpha = llik_r(r2_prop, beta2_curr, lam2_curr, a2, b2) - llik_r(r2_curr, beta2_curr, lam2_curr, a2, b2) + log(r2_prop) - log(r2_curr);
     if (log(runif(1))[0] < log_alpha) {
       r2_curr = r2_prop;
+    }
+    if (i >= burnin && (i - burnin + 1) % thin == 0) {
+      j = (i - burnin + 1) / thin - 1;
+      par_mat(j, _) = NumericVector::create(lam1_curr, lam2_curr, beta1_curr, beta2_curr, r1_curr, r2_curr, (double) k_curr);
+      if ((j + 1) % 100 == 0) {
+        Rcout << j + 1 << endl;
+      }
+    }
+  }
+  return par_mat;
+}
+
+// [[Rcpp::export]]
+const double llik_r_beta(const double r, const double beta, const double lam, const double a, const double b, const double c, const double d) {
+  double llik;
+  if (r <= 0.0 || beta <= 0.0 || lam <= 0.0 || a <= 0.0 || b <= 0.0 || c <= 0.0 || d <= 0.0) {
+    llik = -INFINITY;
+  }
+  else{
+    llik = r * log(beta) + (r - 1.0) * log(lam) + (a - 1.0) * log(r) - b * r - lgamma(r) + (c - 1.0) * log(beta) - beta * d;
+  }
+  return llik;
+}
+
+// [[Rcpp::export]]
+const NumericMatrix mwg_nb_lamk_block(const double r1, const double r2, const double beta1, const double beta2, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_beta1, const double s_beta2, const double rho1, const double rho2, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double c1 = 0.01, const double d1 = 0.01, const double a2 = 0.01, const double b2 = 0.01, const double c2 = 0.01, const double d2 = 0.01) {
+  // Metropolis-within-Gibbs for NB-as-Poisson-Gamma-mixture model, with block updating for (beta1, r1) & (beta2, r2)
+  const int n = x.size();
+  double lam1_curr, lam2_curr, r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, beta1_curr = beta1, beta1_prop, beta2_curr = beta2, beta2_prop, log_alpha;
+  int k_curr = k;
+  NumericMatrix par_mat(N, 7);
+  const IntegerVector indn = seq_len(n) - 1, seq_k = seq_len(n - 1);
+  IntegerVector ind1, ind2;
+  NumericVector x1, x2, cx = cumsum(x), exponent(n - 1), seq_unscaled(n - 1), seq_scaled(n - 1);
+  cx = cx[seq_k - 1];
+  int i, j;
+  RNGScope scope;
+  for (i  = 0; i < N * thin + burnin; i++) {
+    ind1 = seq_len(k_curr) - 1;
+    ind2 = setdiff(indn, ind1);
+    x1 = x[ind1];
+    x2 = x[ind2];
+    lam1_curr = rgamma(1, r1_curr + sum(x1), 1.0 / (beta1_curr + (double) k_curr))[0]; // 1
+    lam2_curr = rgamma(1, r2_curr + sum(x2), 1.0 / (beta2_curr + (double) (n - k_curr)))[0]; // 2
+    exponent = (lam2_curr - lam1_curr) * (NumericVector) seq_k + (log(lam1_curr) - log(lam2_curr)) * cx;
+    seq_unscaled = exp(exponent - max(exponent));
+    seq_unscaled = ifelse(seq_unscaled != seq_unscaled, 0.0, seq_unscaled); // underflow gives nan
+    seq_scaled = seq_unscaled / sum(seq_unscaled); // the probabilities
+    k_curr = Rcpp::RcppArmadillo::sample(seq_k, 1, false, seq_scaled)[0]; // 3
+    beta1_prop = rnorm(1, beta1_curr, s_beta1)[0]; // 4
+    r1_prop = rnorm(1, (r1_curr + s_r1 / s_beta1 * rho1 * (beta1_prop - beta1_curr)), sqrt(1.0 - rho1 * rho1) * s_r1)[0]; // 5
+    log_alpha = llik_r_beta(r1_prop, beta1_prop, lam1_curr, a1, b1, c1, d1) - llik_r_beta(r1_curr, beta1_curr, lam1_curr, a1, b1, c1, d1);
+    if (log(runif(1))[0] < log_alpha) {
+      r1_curr = r1_prop;
+      beta1_prop = beta1_prop;
+    }
+    beta2_prop = rnorm(1, beta2_curr, s_beta2)[0]; // 6
+    r2_prop = rnorm(1, (r2_curr + s_r2 / s_beta2 * rho2 * (beta2_prop - beta2_curr)), sqrt(1.0 - rho2 * rho2) * s_r2)[0]; // 7
+    log_alpha = llik_r_beta(r2_prop, beta2_prop, lam2_curr, a2, b2, c2, d2) - llik_r_beta(r2_curr, beta2_curr, lam2_curr, a2, b2, c2, d2);
+    if (log(runif(1))[0] < log_alpha) {
+      r2_curr = r2_prop;
+      beta2_prop = beta2_prop;
     }
     if (i >= burnin && (i - burnin + 1) % thin == 0) {
       j = (i - burnin + 1) / thin - 1;
