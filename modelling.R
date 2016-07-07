@@ -107,9 +107,10 @@ df0.rqk <- l0.rqk %>%
 
 
 ### chgpt in r & q simultaneously, Bayesian method
-system.time(mwg0.lamk <- mwg_nb_lamk(2.5, 0.9, 0.2, 0.2, 100, x, 4, 4, 1e+4, 100, 5e+4)) # ~0.0004s / iteration (no thinning)
+system.time(mwg0.lamk <- mwg_nb_lamk(2.5, 0.9, 0.2, 0.2, 100, x, 4, 4, 5e+4, 100, 5e+4)) # ~0.0004s / iteration (no thinning)
+# ~1s / 808 iterations on Fujitsu (no thinning)
 
-system.time(mwg1.lamk <- mwg_nb_lamk_block(2.5, 0.9, 0.2, 0.2, 100, x, 8, 9, 28, 25, 0.85, 0.85, 2e+4, 10, 5e+4))
+system.time(mwg1.lamk <- mwg_nb_lamk_block(2.5, 0.9, 0.2, 0.2, 100, x, 0.1, 0.1, 0.1, 0.1, 0.8, 0.8, 2e+5, 1, 0)) # ~0.00123s / iteration (no thinning) on Fujitsu
 
 
 

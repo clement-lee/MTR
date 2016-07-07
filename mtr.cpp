@@ -103,16 +103,6 @@ const double llik_nb_rqk_fix_k(const NumericVector par, const int k, const Numer
 }
 
 // [[Rcpp::export]]
-const double lpost_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
-  // log-posterior of NB model w/ chgpt in r & q simultaneously
-  double lpost = llik_nb_rqk(r1, r2, q1, q2, k, x) + dgamma(NumericVector::create(r1), a1, 1.0 / b1, true)[0] + dgamma(NumericVector::create(r2), a2, 1.0 / b2, true)[0];
-  if (lpost != lpost) {
-    lpost = -INFINITY;
-  }
-  return lpost;
-}
-
-// [[Rcpp::export]]
 const double llik_r(const double r, const double beta, const double lam, const double a, const double b) {
   double llik;
   if (r <= 0.0 || beta <= 0.0 || lam <= 0.0 || a <= 0.0 || b <= 0.0) {
@@ -126,7 +116,7 @@ const double llik_r(const double r, const double beta, const double lam, const d
 
 // [[Rcpp::export]]
 const NumericMatrix mwg_nb_lamk(const double r1, const double r2, const double beta1, const double beta2, const int k, const NumericVector x, const double s_r1, const double s_r2, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double c1 = 0.01, const double d1 = 0.01, const double a2 = 0.01, const double b2 = 0.01, const double c2 = 0.01, const double d2 = 0.01) {
-  // Metropolis-within-Gibbs for NB-as-Poisson-Gamma-mixture model
+  // Metropolis-within-Gibbs for NB model w/ chgpt in r & q simultaneously, w/ NB augmented as a Poisson-Gamma mixture
   const int n = x.size();
   double lam1_curr, lam2_curr, r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, beta1_curr = beta1, beta2_curr = beta2, log_alpha;
   int k_curr = k;
@@ -172,67 +162,6 @@ const NumericMatrix mwg_nb_lamk(const double r1, const double r2, const double b
   return par_mat;
 }
 
-// [[Rcpp::export]]
-const double llik_r_beta(const double r, const double beta, const double lam, const double a, const double b, const double c, const double d) {
-  double llik;
-  if (r <= 0.0 || beta <= 0.0 || lam <= 0.0 || a <= 0.0 || b <= 0.0 || c <= 0.0 || d <= 0.0) {
-    llik = -INFINITY;
-  }
-  else{
-    llik = r * log(beta) + (r - 1.0) * log(lam) + (a - 1.0) * log(r) - b * r - lgamma(r) + (c - 1.0) * log(beta) - beta * d;
-  }
-  return llik;
-}
-
-// [[Rcpp::export]]
-const NumericMatrix mwg_nb_lamk_block(const double r1, const double r2, const double beta1, const double beta2, const int k, const NumericVector x, const double s_r1, const double s_r2, const double s_beta1, const double s_beta2, const double rho1, const double rho2, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double c1 = 0.01, const double d1 = 0.01, const double a2 = 0.01, const double b2 = 0.01, const double c2 = 0.01, const double d2 = 0.01) {
-  // Metropolis-within-Gibbs for NB-as-Poisson-Gamma-mixture model, with block updating for (beta1, r1) & (beta2, r2)
-  const int n = x.size();
-  double lam1_curr, lam2_curr, r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, beta1_curr = beta1, beta1_prop, beta2_curr = beta2, beta2_prop, log_alpha;
-  int k_curr = k;
-  NumericMatrix par_mat(N, 7);
-  const IntegerVector indn = seq_len(n) - 1, seq_k = seq_len(n - 1);
-  IntegerVector ind1, ind2;
-  NumericVector x1, x2, cx = cumsum(x), exponent(n - 1), seq_unscaled(n - 1), seq_scaled(n - 1);
-  cx = cx[seq_k - 1];
-  int i, j;
-  RNGScope scope;
-  for (i  = 0; i < N * thin + burnin; i++) {
-    ind1 = seq_len(k_curr) - 1;
-    ind2 = setdiff(indn, ind1);
-    x1 = x[ind1];
-    x2 = x[ind2];
-    lam1_curr = rgamma(1, r1_curr + sum(x1), 1.0 / (beta1_curr + (double) k_curr))[0]; // 1
-    lam2_curr = rgamma(1, r2_curr + sum(x2), 1.0 / (beta2_curr + (double) (n - k_curr)))[0]; // 2
-    exponent = (lam2_curr - lam1_curr) * (NumericVector) seq_k + (log(lam1_curr) - log(lam2_curr)) * cx;
-    seq_unscaled = exp(exponent - max(exponent));
-    seq_unscaled = ifelse(seq_unscaled != seq_unscaled, 0.0, seq_unscaled); // underflow gives nan
-    seq_scaled = seq_unscaled / sum(seq_unscaled); // the probabilities
-    k_curr = Rcpp::RcppArmadillo::sample(seq_k, 1, false, seq_scaled)[0]; // 3
-    beta1_prop = rnorm(1, beta1_curr, s_beta1)[0]; // 4
-    r1_prop = rnorm(1, (r1_curr + s_r1 / s_beta1 * rho1 * (beta1_prop - beta1_curr)), sqrt(1.0 - rho1 * rho1) * s_r1)[0]; // 5
-    log_alpha = llik_r_beta(r1_prop, beta1_prop, lam1_curr, a1, b1, c1, d1) - llik_r_beta(r1_curr, beta1_curr, lam1_curr, a1, b1, c1, d1);
-    if (log(runif(1))[0] < log_alpha) {
-      r1_curr = r1_prop;
-      beta1_prop = beta1_prop;
-    }
-    beta2_prop = rnorm(1, beta2_curr, s_beta2)[0]; // 6
-    r2_prop = rnorm(1, (r2_curr + s_r2 / s_beta2 * rho2 * (beta2_prop - beta2_curr)), sqrt(1.0 - rho2 * rho2) * s_r2)[0]; // 7
-    log_alpha = llik_r_beta(r2_prop, beta2_prop, lam2_curr, a2, b2, c2, d2) - llik_r_beta(r2_curr, beta2_curr, lam2_curr, a2, b2, c2, d2);
-    if (log(runif(1))[0] < log_alpha) {
-      r2_curr = r2_prop;
-      beta2_prop = beta2_prop;
-    }
-    if (i >= burnin && (i - burnin + 1) % thin == 0) {
-      j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(lam1_curr, lam2_curr, beta1_curr, beta2_curr, r1_curr, r2_curr, (double) k_curr);
-      if ((j + 1) % 100 == 0) {
-        Rcout << j + 1 << endl;
-      }
-    }
-  }
-  return par_mat;
-}
 
 
 
