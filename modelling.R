@@ -110,15 +110,16 @@ df0.rqk <- l0.rqk %>%
 system.time(mwg0.lamk <- mwg_nb_lamk(2.5, 0.9, 0.2, 0.2, 100, x, 4, 4, 5e+4, 100, 5e+4)) # ~0.0004s / iteration (no thinning)
 # ~1s / 808 iterations on Fujitsu (no thinning)
 
-system.time(mwg1.lamk <- mwg_nb_lamk_block(2.5, 0.9, 0.2, 0.2, 100, x, 0.1, 0.1, 0.1, 0.1, 0.8, 0.8, 2e+5, 1, 0)) # ~0.00123s / iteration (no thinning) on Fujitsu
+# target sd for r1 & r2: 4.11 & 1.42
+system.time(mwg0.rqk <- mwg_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.4, 0.35, 1e+4, 100, 5e+4)) # 0.00132778s / iteration (no thinning)
+# save the results of this ultimate model?
 
 
 
 ### pred. dist. for daily count
-l0.pred.rqk <- sapply(0:6, dnbinom_rqk, rwm0.rqk$par[,1], rwm0.rqk$par[,2], rwm0.rqk$par[,3], rwm0.rqk$par[,4], rwm0.rqk$par[,5], n0.days, simplify = F) # daily
-v0.pred.rqk <- sapply(l0.pred, mean) # combine with existing data_frames?
+l1.pred.rqk <- sapply(0:6, dnbinom_rqk, mwg0.rqk[,1], mwg0.rqk[,2], mwg0.rqk[,3], mwg0.rqk[,4], mwg0.rqk[,5], n0.days, simplify = F) # daily
+v1.pred.rqk <- sapply(l1.pred.rqk, mean) # combine with e.g. df0.counts?
 ## have to think about how to work out weekly numbers
-
 
 
 

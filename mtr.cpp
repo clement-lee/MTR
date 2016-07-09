@@ -162,6 +162,69 @@ const NumericMatrix mwg_nb_lamk(const double r1, const double r2, const double b
   return par_mat;
 }
 
+// [[Rcpp::export]]
+const double llik_r_nb_rqk(const double r, const double q, const NumericVector x_partial, const double a, const double b) {
+  // for llik of r1 & r2 in MWG sampler for NB model w/ chgpt in r & q simultaneously
+  const int l = x_partial.size();
+  const NumericVector lg = lgamma(x_partial + r) - lgamma(r) + r * log(q),
+    dgr = dgamma(NumericVector::create(r), a, 1.0 / b, true);
+  const double llik = sum(lg) + sum(dgr); // not equivalent to sum(lg + dgr) - think!
+  return llik;
+}
+
+// [[Rcpp::export]]
+const NumericMatrix mwg_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x, const double s_r1, const double s_r2, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
+  // Metropolis-within-Gibbs for NB model w/ chgpt in r & q simultaneously
+  const int n = x.size();
+  if (k < 1 || k >= n) {
+    stop("k has to be a positive integer smaller than n.");
+  }
+  if (r1 <= 0.0 || r2 <= 0.0 || q1 <= 0.0 || q2 <= 0.0) {
+    stop("All parameters have to be positive.");
+  }
+  double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q1_curr = q1, q2_curr = q2, log_alpha;
+  int k_curr = k;
+  NumericMatrix par_mat(N, 5);
+  const IntegerVector seq_n = seq_len(n - 1); // 1 to (n - 1)
+  NumericVector x1, x2, x__n = head(x, n - 1), lgamma1(n - 1), lgamma2(n - 1), seq_unscaled(n - 1), seq_scaled(n - 1);
+  int i, j;
+  RNGScope scope;
+  for (i = 0; i < N * thin + burnin; i++) {
+    // update r1 & r2
+    x1 = head(x, k_curr);
+    r1_prop = exp(rnorm(1, log(r1_curr), s_r1))[0];
+    log_alpha = llik_r_nb_rqk(r1_prop, q1_curr, x1, a1, b1) - llik_r_nb_rqk(r1_curr, q1_curr, x1, a1, b1) + log(r1_prop) - log(r1_curr);
+    if (log(runif(1))[0] < log_alpha) {
+      r1_curr = r1_prop;
+    }
+    x2 = tail(x, n - k_curr);
+    r2_prop = exp(rnorm(1, log(r2_curr), s_r2))[0];
+    log_alpha = llik_r_nb_rqk(r2_prop, q2_curr, x2, a2, b2) - llik_r_nb_rqk(r2_curr, q2_curr, x2, a2, b2) + log(r2_prop) - log(r2_curr);
+    if (log(runif(1))[0] < log_alpha) {
+      r2_curr = r2_prop;
+    }
+    // update q1 & q2
+    q1_curr = rbeta(1, (double) k_curr * r1_curr + 1.0, sum(x1) + 1.0)[0];
+    q2_curr = rbeta(1, (double) (n - k_curr) * r2_curr + 1.0, sum(x2) + 1.0)[0];
+    // update k
+    lgamma1 = lgamma(x__n + r1_curr) - lgamma(r1_curr) + r1_curr * log(q1_curr) + x__n * log(1.0 - q1_curr);
+    lgamma2 = lgamma(x__n + r2_curr) - lgamma(r2_curr) + r2_curr * log(q2_curr) + x__n * log(1.0 - q2_curr);
+    NumericVector exponent = cumsum(lgamma1 - lgamma2); // have to define everytime
+    seq_unscaled = exp(exponent - max(exponent));
+    seq_unscaled = ifelse(seq_unscaled != seq_unscaled, 0.0, seq_unscaled); // underflow gives nan
+    seq_scaled = seq_unscaled / sum(seq_unscaled); // the probabilities
+    k_curr = Rcpp::RcppArmadillo::sample(seq_n, 1, false, seq_scaled)[0];
+    if (i >= burnin && (i - burnin + 1) % thin == 0) {
+      j = (i - burnin + 1) / thin - 1;
+      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q1_curr, q2_curr, (double) k_curr);
+      if ((j + 1) % 100 == 0) {
+        Rcout << j + 1 << endl;
+      }
+    }
+  }
+  return par_mat;
+}
+
 
 
 
