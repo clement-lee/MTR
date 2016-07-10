@@ -78,8 +78,11 @@ const double llik_nb_rqk(const double r1, const double r2, const double q1, cons
   // log-likelihood of NB model w/ chgpt in r & q simultaneously
   const int n = x.size();
   double llik;
-  if (r1 <= 0.0 || r2 <= 0.0 || q1 <= 0.0 || q1 > 1.0 || q2 <= 0.0 || q2 > 1.0 || k < 1 || k >= n) {
+  if (r1 <= 0.0 || r2 <= 0.0 || q1 <= 0.0 || q1 > 1.0 || q2 <= 0.0 || q2 > 1.0 || k < 1 || k > n) {
     llik = -INFINITY;
+  }
+  else if (k == n) {
+    llik = sum(dnbinom(x, r1, q1, true));
   }
   else {
     // a chgpt less than n
@@ -103,66 +106,6 @@ const double llik_nb_rqk_fix_k(const NumericVector par, const int k, const Numer
 }
 
 // [[Rcpp::export]]
-const double llik_r(const double r, const double beta, const double lam, const double a, const double b) {
-  double llik;
-  if (r <= 0.0 || beta <= 0.0 || lam <= 0.0 || a <= 0.0 || b <= 0.0) {
-    llik = -INFINITY;
-  }
-  else{
-    llik = r * log(beta) + (r - 1.0) * log(lam) + (a - 1.0) * log(r) - b * r - lgamma(r);
-  }
-  return llik;
-}
-
-// [[Rcpp::export]]
-const NumericMatrix mwg_nb_lamk(const double r1, const double r2, const double beta1, const double beta2, const int k, const NumericVector x, const double s_r1, const double s_r2, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double c1 = 0.01, const double d1 = 0.01, const double a2 = 0.01, const double b2 = 0.01, const double c2 = 0.01, const double d2 = 0.01) {
-  // Metropolis-within-Gibbs for NB model w/ chgpt in r & q simultaneously, w/ NB augmented as a Poisson-Gamma mixture
-  const int n = x.size();
-  double lam1_curr, lam2_curr, r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, beta1_curr = beta1, beta2_curr = beta2, log_alpha;
-  int k_curr = k;
-  NumericMatrix par_mat(N, 7);
-  const IntegerVector indn = seq_len(n) - 1, seq_k = seq_len(n - 1);
-  IntegerVector ind1, ind2;
-  NumericVector x1, x2, cx = cumsum(x), exponent(n - 1), seq_unscaled(n - 1), seq_scaled(n - 1);
-  cx = cx[seq_k - 1];
-  int i, j;
-  RNGScope scope;
-  for (i  = 0; i < N * thin + burnin; i++) {
-    ind1 = seq_len(k_curr) - 1;
-    ind2 = setdiff(indn, ind1);
-    x1 = x[ind1];
-    x2 = x[ind2];
-    lam1_curr = rgamma(1, r1_curr + sum(x1), 1.0 / (beta1_curr + (double) k_curr))[0]; // 1
-    lam2_curr = rgamma(1, r2_curr + sum(x2), 1.0 / (beta2_curr + (double) (n - k_curr)))[0]; // 2
-    exponent = (lam2_curr - lam1_curr) * (NumericVector) seq_k + (log(lam1_curr) - log(lam2_curr)) * cx;
-    seq_unscaled = exp(exponent - max(exponent));
-    seq_unscaled = ifelse(seq_unscaled != seq_unscaled, 0.0, seq_unscaled); // underflow gives nan
-    seq_scaled = seq_unscaled / sum(seq_unscaled); // the probabilities
-    k_curr = Rcpp::RcppArmadillo::sample(seq_k, 1, false, seq_scaled)[0]; // 3
-    beta1_curr = rgamma(1, r1_curr + c1, 1.0 / (lam1_curr + d1))[0]; // 4
-    beta2_curr = rgamma(1, r2_curr + c2, 1.0 / (lam2_curr + d2))[0]; // 5
-    r1_prop = exp(rnorm(1, log(r1_curr), s_r1))[0]; // 6
-    log_alpha = llik_r(r1_prop, beta1_curr, lam1_curr, a1, b1) - llik_r(r1_curr, beta1_curr, lam1_curr, a1, b1) + log(r1_prop) - log(r1_curr);
-    if (log(runif(1))[0] < log_alpha) {
-      r1_curr = r1_prop;
-    }
-    r2_prop = exp(rnorm(1, log(r2_curr), s_r2))[0]; // 7
-    log_alpha = llik_r(r2_prop, beta2_curr, lam2_curr, a2, b2) - llik_r(r2_curr, beta2_curr, lam2_curr, a2, b2) + log(r2_prop) - log(r2_curr);
-    if (log(runif(1))[0] < log_alpha) {
-      r2_curr = r2_prop;
-    }
-    if (i >= burnin && (i - burnin + 1) % thin == 0) {
-      j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(lam1_curr, lam2_curr, beta1_curr, beta2_curr, r1_curr, r2_curr, (double) k_curr);
-      if ((j + 1) % 100 == 0) {
-        Rcout << j + 1 << endl;
-      }
-    }
-  }
-  return par_mat;
-}
-
-// [[Rcpp::export]]
 const double llik_r_nb_rqk(const double r, const double q, const NumericVector x_partial, const double a, const double b) {
   // for llik of r1 & r2 in MWG sampler for NB model w/ chgpt in r & q simultaneously
   const int l = x_partial.size();
@@ -173,7 +116,7 @@ const double llik_r_nb_rqk(const double r, const double q, const NumericVector x
 }
 
 // [[Rcpp::export]]
-const NumericMatrix mwg_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x, const double s_r1, const double s_r2, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
+List mwg_nb_rqk(const double r1, const double r2, const double q1, const double q2, const int k, const NumericVector x, const double s_r1, const double s_r2, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a1 = 0.01, const double b1 = 0.01, const double a2 = 0.01, const double b2 = 0.01) {
   // Metropolis-within-Gibbs for NB model w/ chgpt in r & q simultaneously
   const int n = x.size();
   if (k < 1 || k >= n) {
@@ -184,8 +127,9 @@ const NumericMatrix mwg_nb_rqk(const double r1, const double r2, const double q1
   }
   double r1_curr = r1, r1_prop, r2_curr = r2, r2_prop, q1_curr = q1, q2_curr = q2, log_alpha;
   int k_curr = k;
-  NumericMatrix par_mat(N, 5);
-  const IntegerVector seq_n = seq_len(n - 1); // 1 to (n - 1)
+  NumericVector r1_vec(N), r2_vec(N), q1_vec(N), q2_vec(N);
+  IntegerVector k_vec(N);
+  const IntegerVector seq__n = seq_len(n - 1); // 1 to (n - 1); *__n means excluding the nth element
   NumericVector x1, x2, x__n = head(x, n - 1), lgamma1(n - 1), lgamma2(n - 1), seq_unscaled(n - 1), seq_scaled(n - 1);
   int i, j;
   RNGScope scope;
@@ -213,18 +157,19 @@ const NumericMatrix mwg_nb_rqk(const double r1, const double r2, const double q1
     seq_unscaled = exp(exponent - max(exponent));
     seq_unscaled = ifelse(seq_unscaled != seq_unscaled, 0.0, seq_unscaled); // underflow gives nan
     seq_scaled = seq_unscaled / sum(seq_unscaled); // the probabilities
-    k_curr = Rcpp::RcppArmadillo::sample(seq_n, 1, false, seq_scaled)[0];
+    k_curr = Rcpp::RcppArmadillo::sample(seq__n, 1, false, seq_scaled)[0];
     if (i >= burnin && (i - burnin + 1) % thin == 0) {
       j = (i - burnin + 1) / thin - 1;
-      par_mat(j, _) = NumericVector::create(r1_curr, r2_curr, q1_curr, q2_curr, (double) k_curr);
+      r1_vec[j] = r1_curr;
+      r2_vec[j] = r2_curr;
+      q1_vec[j] = q1_curr;
+      q2_vec[j] = q2_curr;
+      k_vec[j] = k_curr;
       if ((j + 1) % 100 == 0) {
         Rcout << j + 1 << endl;
       }
     }
   }
-  return par_mat;
+  DataFrame output = DataFrame::create(Named("r1") = r1_vec, Named("r2") = r2_vec, Named("q1") = q1_vec, Named("q2") = q2_vec, Named("k") = k_vec);
+  return output;
 }
-
-
-
-

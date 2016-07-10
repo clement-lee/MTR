@@ -78,18 +78,20 @@ df1.days <- df0.days %>%
 
 ### chgpt in r & q simultaneously, likelihood method
 l0.rqk <- list()
-for (i in seq_along(t0)) {
-    print(i)
-    par0.rqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
-    obj0.rqk <- optim(par0.rqk, llik_nb_rqk_fix_k, x = x, k = i, control = optim.ctrl)
-    l0.rqk[[i]] <- data_frame(
-        llik = obj0.rqk$value,
-        r1 = obj0.rqk$par[1],
-        r2 = obj0.rqk$par[2],
-        q1 = obj0.rqk$par[3],
-        q2 = obj0.rqk$par[4]
-    )
-}
+system.time({
+    for (i in seq_along(t0)) {
+        print(i)
+        par0.rqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
+        obj0.rqk <- optim(par0.rqk, llik_nb_rqk_fix_k, x = x, k = i, control = optim.ctrl)
+        l0.rqk[[i]] <- data_frame(
+            llik = obj0.rqk$value,
+            r1 = obj0.rqk$par[1],
+            r2 = obj0.rqk$par[2],
+            q1 = obj0.rqk$par[3],
+            q2 = obj0.rqk$par[4]
+        )
+    }
+})
 df0.rqk <- l0.rqk %>% 
     bind_rows %>% 
     bind_cols(df0.days, .) %>% 
@@ -107,11 +109,8 @@ df0.rqk <- l0.rqk %>%
 
 
 ### chgpt in r & q simultaneously, Bayesian method
-system.time(mwg0.lamk <- mwg_nb_lamk(2.5, 0.9, 0.2, 0.2, 100, x, 4, 4, 5e+4, 100, 5e+4)) # ~0.0004s / iteration (no thinning)
-# ~1s / 808 iterations on Fujitsu (no thinning)
-
-# target sd for r1 & r2: 4.11 & 1.42
-system.time(mwg0.rqk <- mwg_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.4, 0.35, 1e+4, 100, 5e+4)) # 0.00132778s / iteration (no thinning)
+set.seed(12345)
+system.time(mwg0.rqk <- mwg_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.4, 0.35, 1e+4, 10, 5e+4)) # 0.0013112s / iteration (no thinning)
 # save the results of this ultimate model?
 
 
