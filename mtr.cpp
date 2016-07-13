@@ -99,6 +99,64 @@ const double llik_nb_rt(const NumericVector par, const NumericVector x, const Nu
 }
 
 // [[Rcpp::export]]
+const double lpost_nb_rt(const double r0, const double q, const double theta, const NumericVector x, const NumericVector t, const double a = 0.01, const double b = 0.01, const double mu = 0.0, const double sigma = 100) {
+  // log-posterior density of NB modwl w/ trend in r (size)
+  const NumericVector par = NumericVector::create(r0, q, theta);
+  double llik = llik_nb_rt(par, x, t) + dgamma(NumericVector::create(r0), a, 1.0 / b, true)[0] + dnorm(NumericVector::create(theta), mu, sigma)[0];
+  if (llik != llik) { // NaN
+    llik = -INFINITY;
+  }
+  return llik;
+}
+
+// [[Rcpp::export]]
+List mwg_nb_rt(const double r0, const double q, const double theta, const NumericVector x, const NumericVector t, const double s_r0, const double s_theta, const int N = 1e+6, const int thin = 1, const int burnin = 0, const double a = 0.01, const double b = 0.01, const double mu = 0.0, const double sigma = 100) {
+  // Metropolis-within-Gibbs for NB model w/ trend in r (size)
+  const int n = x.size();
+  if (r0 <= 0.0 || q <= 0.0) {
+    stop("r0 & q have to be positive.");
+  }
+  double r0_curr = r0, r0_prop, q_curr = q, theta_curr = theta, theta_prop, lpost_curr = lpost_nb_rt(r0_curr, q_curr, theta_curr, x, t, a, b, mu, sigma), lpost_prop, log_alpha;
+  NumericVector r0_vec(N), q_vec(N), theta_vec(N), llik_vec(N), par(3);
+  int i, j;
+  RNGScope scope;
+  for (i = 0; i < N * thin + burnin; i++) {
+    // update r0
+    r0_prop = exp(rnorm(1, log(r0_curr), s_r0))[0];
+    lpost_prop = lpost_nb_rt(r0_prop, q_curr, theta_curr, x, t, a, b, mu, sigma);
+    log_alpha = lpost_prop - lpost_curr + log(r0_prop) - log(r0_curr);
+    if (log(runif(1))[0] < log_alpha) {
+      r0_curr = r0_prop;
+    }
+    // update q
+    q_curr = rbeta(1, (double) n * r0_curr + theta_curr * sum(t) + 1.0, sum(x) + 1.0)[0];
+    // update theta
+    lpost_curr = lpost_nb_rt(r0_curr, q_curr, theta_curr, x, t, a, b, mu, sigma); // have to calculate after updating q via Gibbs
+    theta_prop = rnorm(1, theta_curr, s_theta)[0];
+    lpost_prop = lpost_nb_rt(r0_curr, q_curr, theta_prop, x, t, a, b, mu, sigma);
+    log_alpha = lpost_prop - lpost_curr;
+    if (log(runif(1))[0] < log_alpha) {
+      theta_curr = theta_prop;
+      lpost_curr = lpost_prop; // for r in next iteration
+    }
+    // save 
+    if (i >= burnin && (i - burnin + 1) % thin == 0) {
+      j = (i - burnin + 1) / thin - 1;
+      r0_vec[j] = r0_curr;
+      q_vec[j] = q_curr;
+      theta_vec[j] = theta_curr;
+      par = NumericVector::create(r0_curr, q_curr, theta_curr);
+      llik_vec[j] = llik_nb_rt(par, x, t);
+      if ((j + 1) % 100 == 0) {
+        Rcout << j + 1 << endl;
+      }
+    }
+  }
+  DataFrame output = DataFrame::create(Named("r0") = r0_vec, Named("q") = q_vec, Named("theta") = theta_vec, Named("llik") = llik_vec);
+  return output;
+}
+
+// [[Rcpp::export]]
 const double llik_nb_qt(const NumericVector par, const NumericVector x, const NumericVector t) {
   // log-likelihood of NB model w/ trend in q (prob)
   if (x.size() != t.size()) {
@@ -129,7 +187,7 @@ const double llik_nb_rqk(const NumericVector par, const NumericVector x) {
   }
   const int n = x.size(), k = (int) par[4];
   double llik;
-  NumericVector par1 = NumericVector::create(par[0], par[1]), par2 = NumericVector::create(par[2], par[3]);
+  NumericVector par1 = NumericVector::create(par[0], par[2]), par2 = NumericVector::create(par[1], par[3]);
   if (k < 1 || k > n) {
     llik = -INFINITY;
   }

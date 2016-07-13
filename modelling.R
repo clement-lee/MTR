@@ -107,15 +107,23 @@ df0.rqk <- l0.rqk %>%
 
 ### BAYESIAN: simple NB model (model 1)
 set.seed(1000)
-system.time(mwg0.nb <- mwg_nb(2.5, 0.2, x, 0.2, 1e+4, 10, 5e+4))
+system.time(mwg0.nb <- mwg_nb(2.5, 0.2, x, 0.2, 1e+4, 100, 5e+4))
 ## ~0.00118676s / iteration on avignon; ~0.0014014s / iteration on Fujitsu
 write_csv(mwg0.nb, "mwg_nb.csv")
 
 
 
+### BAYESIAN: trend in r (size) model
+set.seed(2000)
+system.time(mwg0.rt <- mwg_nb_rt(2.5, 0.2, 0.0, x, t0, 0.25, 3e-4, 1e+4, 100, 5e+4))
+## ~0.00270456s / iteration on avignon
+write_csv(mwg0.rt, "mwg_rt.csv")
+
+
+
 ### BAYESIAN: chgpt in r & q simultaneously (model 2)
 set.seed(12345)
-system.time(mwg0.rqk <- mwg_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.4, 0.35, 1e+4, 10, 5e+4))
+system.time(mwg0.rqk <- mwg_nb_rqk(2.5, 0.9, 0.2, 0.2, 100, x, 0.4, 0.35, 1e+4, 100, 5e+4))
 ## ~0.0013112s / iteration (no thinning) on XPS; ~0.00176656s / iteration on avignon
 write_csv(mwg0.rqk, "mwg_rqk.csv")
 
