@@ -3,15 +3,6 @@ options(width = 200) # changes when console screen does so, on windows
 remove(list = ls())
 print(base::date())
 options(width = 150)
-library(magrittr) # pipe operator
-library(rjson) # read files in json format
-library(lubridate) # dates
-library(readr) # read from files
-library(stringr) # string manipulation
-library(plyr) # matrices and lists manipulation
-library(dplyr) # data frame manipulation
-library(tidyr) # tidy the data set
-library(data.table) # bind multiple data frames
 source("functions_mtr.R")
 ### functions assumed to be dplyr/base/self-written unless otherwise specified
 
@@ -40,6 +31,8 @@ typo <- c("Tsueng Kwan O" = "Tseung Kwan O",
           "Signals Failure" = "Signal Failure",
           "Powet" = "Power",
           "Fault Track" = "Faulty Track")
+df.lines <- readr::read_csv("lines.csv") %>%
+    select(line = 1, line.chi = 2) # for lines in chinese
 
 
 
@@ -113,7 +106,9 @@ df4.match <- df3.match %>%
     ## iv) dates manipulation - for modelling & visualisaion
     mutate(month = op_date %>% cut(breaks = "month") %>% as.Date, # alt: month1 = op_date %>% lubridate::floor_date("month")
            month.mid = month + days(14), # mid-month, quick fix for position adjustment
-           week = op_date %>% cut(breaks = "week") %>% as.Date)
+           week = op_date %>% cut(breaks = "week") %>% as.Date) %>% 
+    left_join(df.lines, by = "line")
+write_csv(df4.match, "incidents.csv")
 ## Cross check with df3.match for any future changes, to make sure there are no unwanted omission.
 ## Issues: incidents with NA good service tweets can't have downtime computed.
 
@@ -153,6 +148,7 @@ df0.weeks <- seq(df4.match$week %>% min, df4.match$week %>% max, by = 7) %>%
     mutate(kwun.tong = ifelse(is.na(n), 0L, n)) %>% 
     select(-n)
 ## write a function to do the above!
+write_csv(df0.weeks, "ts_weeks.csv") # move if we model weekly counts
 n0.weeks <- df0.weeks %>% nrow
 
 
@@ -166,6 +162,7 @@ df0.months <- (df4.match$month %>% min + months(0:(n0.months - 1))) %>%
     left_join(df4.match %>% count(month), by = "month") %>% 
     mutate(all = ifelse(is.na(n), 0L, n)) %>% 
     select(-n)
+write_csv(df0.months, "ts_months.csv") # move if we model monthly counts
 
 
 

@@ -12,18 +12,29 @@ library(RcppArmadillo)
 sourceCpp("mtr.cpp") # load required llik() functions etc.
 optim.ctrl <- list(fnscale = -1, reltol = 1e-10, maxit = 5000)
 x <- df0.days$all
+t0 <- seq_along(x) # time indices i.e. support of chgpt k
 
 
 
-### LIKELIHOOD: FIT models 0, 1, 2 & 2.5
+### LIKELIHOOD: FIT models 0, 1, 2, 2.5 & 3
 mle.p <- x %>% mean # sample mean = MLE of lambda, no numerical computing required
 obj0.nb <- optim(c(3/7, 0.5), llik_nb, x = x, control = optim.ctrl)
 mle.nb <- obj0.nb$par
-t0 <- seq_along(x)
 obj0.rt <- optim(c(mle.nb, 1e-5), llik_nb_rt, x = x, t = t0, control = optim.ctrl)
 mle.rt <- obj0.rt$par
 obj0.qt <- optim(c(mle.nb, 1e-5), llik_nb_qt, x = x, t = t0, control = optim.ctrl)
 mle.qt <- obj0.qt$par
+system.time({
+    l0.rqk <- sapply(t0, function(k) {
+        print(k)
+        par0.rqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
+        obj0.rqk <- optim(par0.rqk, llik_nb_rqk_fix_k, x = x, k = k, control = optim.ctrl)
+        return(obj0.rqk)
+    }, simplify = F)
+}) # ~780s on Fujitsu
+ind.rqk <- l0.rqk %>% sapply(extract2, "value") %>% which.max
+obj0.rqk <- l0.rqk[[ind.rqk]]
+mle.rqk <- c(l0.rqk[[ind.rqk]]$par, t0[ind.rqk])
 
 
 
@@ -45,70 +56,44 @@ df0.counts <- seq(0, x %>% max) %>%
     select(-n) %>%
     ## iv) all, estimated by Poisson & negative Binomial
     mutate(all.est.p = count %>% dpois(mle.p) * n0.days,
-           all.est.nb = count %>% dnbinom(mle.nb[1], mle.nb[2]) * n0.days,
-           summand.p = (all - all.est.p) ^ 2 / all.est.p, # for pearson chi-sq test
-           summand.nb = (all - all.est.nb) ^ 2 / all.est.nb) # same as summand.p
-## we put it here as it is NOT needed for vis via ggplot2
+           all.est.nb = count %>% dnbinom(mle.nb[1], mle.nb[2]) * n0.days)
 
 
 
-### LIKELIHOOD: TESTS
+### LIKELIHOOD: DIAGNOSTICS & SELECTION
 ## Pearson chi-squared goodness-of-fit test
-(df0.counts %>% 
-    summarise(Poisson = sum(summand.p), 
-              Negative.Binomial = sum(summand.nb),
-              Chi.squared = qchisq(0.95, df0.counts %>% nrow - 1)))
-## likelihood ratio tests
-data_frame(critical.value = qchisq(0.95, 1),
-           test.stat.rt = 2 * (obj0.rt$value - obj0.nb$value),
-           test.stat.qt = 2 * (obj0.qt$value - obj0.nb$value)) %>%
+df0.counts %>% 
+    summarise(Poisson = sum((all - all.est.p) ^ 2 / all.est.p), 
+              Negative.Binomial = sum((all - all.est.nb) ^ 2 / all.est.nb),
+              Chi.squared = qchisq(0.95, df0.counts %>% nrow - 1)) %>% 
     print
-### interestingly, theta is "significant" in both models
+## likelihood ratio tests & AIC
+data_frame(cv.rt = qchisq(0.95, mle.rt %>% length - mle.nb %>% length),
+           stat.rt = 2 * (obj0.rt$value - obj0.nb$value),
+           AIC.rt = 2 * (mle.rt %>% length - obj0.rt$value),
+           cv.qt = qchisq(0.95, mle.qt %>% length - mle.nb %>% length),
+           stat.qt = 2 * (obj0.qt$value - obj0.nb$value),
+           AIC.qt = 2 * (mle.qt %>% length - obj0.qt$value),
+           cv.rqk = qchisq(0.95, mle.rqk %>% length - mle.nb %>% length),
+           stat.rqk = 2 * (obj0.rqk$value - obj0.nb$value),
+           AIC.rqk = 2 * (mle.rqk %>% length - obj0.rqk$value)) %>%
+    print
+### interestingly, all models are "significant"
 
 
 
-### LIKELIHOOD: PREPARE new data_frame for vis (OBSOLETE?)
+### LIKELIHOOD: PREPARE new data_frame for vis
 df1.days <- df0.days %>% 
-    mutate(t = t0, 
-           rt = (mle.rt[1] + mle.rt[3] * t0),
-           q = mle.rt[2],
-           mean.rt = rt * (1.0 - q)/ q, 
-           r = mle.qt[1],
-           qt = (mle.qt[2] + mle.qt[3] * t0),
-           mean.qt = r * (1.0 - qt) / qt)
-
-
-
-### LIKELIHOOD: FIT model 3
-l0.rqk <- list()
-system.time({
-    for (i in seq_along(t0)) {
-        print(i)
-        par0.rqk <- c(mle.nb[1], mle.nb[1], mle.nb[2], mle.nb[2])
-        obj0.rqk <- optim(par0.rqk, llik_nb_rqk_fix_k, x = x, k = i, control = optim.ctrl)
-        l0.rqk[[i]] <- data_frame(
-            llik = obj0.rqk$value,
-            r1 = obj0.rqk$par[1],
-            r2 = obj0.rqk$par[2],
-            q1 = obj0.rqk$par[3],
-            q2 = obj0.rqk$par[4]
-        )
-    }
-})
-df0.rqk <- l0.rqk %>% 
-    bind_rows %>% 
-    bind_cols(df0.days, .) %>% 
-    mutate(
-        k = which.max(llik),
-        r1 = r1[k],
-        r2 = r2[k],
-        q1 = q1[k],
-        q2 = q2[k],
-        r = ifelse(op_date <= op_date[k], r1, r2),
-        q = ifelse(op_date <= op_date[k], q1, q2),
-        mean = r * (1.0 - q) / q
-    )
-## maybe save df0.rqk as csv file for easy access?
+    mutate(r.rt = (mle.rt[1] + mle.rt[3] * t0),
+           q.rt = mle.rt[2],
+           mean.rt = r.rt * (1.0 - q.rt) / q.rt, 
+           r.qt = mle.qt[1],
+           q.qt = (mle.qt[2] + mle.qt[3] * t0),
+           mean.qt = r.qt * (1.0 - q.qt) / q.qt,
+           r.rqk = ifelse(t0 <= mle.rqk[5], mle.rqk[1], mle.rqk[2]),
+           q.rqk = ifelse(t0 <= mle.rqk[5], mle.rqk[3], mle.rqk[4]),
+           mean.rqk = r.rqk * (1.0 - q.rqk) / q.rqk)
+write_csv(df1.days, "ts_days.csv")
 
 
 
@@ -135,10 +120,10 @@ write_csv(mwg0.rqk, "mwg_rqk.csv")
 offset <- mwg0.rqk$llik %>% max
 ## compare model 3 w/ model 1
 K31 <- exp(mwg0.rqk$llik - offset) %>% mean / exp(mwg0.nb$llik - offset) %>% mean # ~100
-print(c(K31, 2 * log(K31)))
+print(c(K31, 2 * log(K31))) # strength of evidence: strong
 ## compare model 3 w/ model 2
 K32 <- exp(mwg0.rqk$llik - offset) %>% mean / exp(mwg0.rt$llik - offset) %>% mean # ~6
-print(c(K32, 2 * log(K32)))
+print(c(K32, 2 * log(K32))) # strength of evidence: positive
 
 
 
@@ -173,10 +158,11 @@ df1.counts <- seq(0, x %>% max) %>%
     mutate(all.est.rqk =
            count %>%
            sapply(dnbinom_rqk, mwg0.rqk$r1, mwg0.rqk$r2, mwg0.rqk$q1, mwg0.rqk$q2, mwg0.rqk$k, n0.days, simplify = F) %>%
-           sapply(mean) %>%
+           sapply(mean, simplify = F) %>%
            sapply("*", n0.days)
            ) %>% 
     print
+write_csv(df1.counts, "counts_days.csv")
 
 df1.freq <- df1.counts %>% 
     transmute(count, 

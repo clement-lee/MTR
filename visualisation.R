@@ -1,8 +1,20 @@
 ### Principle: we shouldn't do any further data manipulation like counting here. 
 ### Any summaries can and should be done via stat functions in ggplot2.
+### Unless otherwise specified, any function used is in ggplot2/base.
+### This means even dplyr functions have to be specified & kept to minimum.
 
 remove(list = ls())
-source("modelling.R") # run the whole script, which in turn runs extraction.R
+#source("modelling.R") # run the whole script, which in turn runs extraction.R
+if (TRUE) { # load only necessity instead of running extraction & modelling
+    source("functions_mtr.R")
+    df4.match <- read_csv("incidents.csv") # from extraction
+    df1.days <- read_csv("ts_days.csv") # from modelling
+    x <- df1.days$all
+    t0 <- seq_along(x)
+    df0.weeks <- read_csv("ts_weeks.csv") # from extraction
+    df0.months <- read_csv("ts_months.csv") # from extraction
+    df1.counts <- read_csv("counts_days.csv") # from modelling
+}
 library(ggplot2)
 theme_set(theme_bw(24))
 dev.new(width = 5.97, height = 7.45)
@@ -35,7 +47,7 @@ df4.match %>%
 ### 02) Overall temporal analysis
 ## basic with graphics::hist
 df4.match %>% 
-    extract2("month.mid") %>% 
+    magrittr::extract2("month.mid") %>% 
     hist(., breaks = unique(.))
 
 ## histogram over time
@@ -59,7 +71,7 @@ df0.weeks %>% # monthly counterpart
     geom_point() +
     labs(title = "Weekly number of all incidents",
          x = "Time", y = "Number of incidents")
-df0.days %>% 
+df1.days %>% # essentially df1.days + w/ model estimates
     ggplot(aes(op_date, all)) + 
     geom_line() + 
     geom_point() +
@@ -73,7 +85,7 @@ df0.months %>%
 df0.weeks %>% 
     magrittr::extract2("all") %>%
     acf(100)
-df0.days %>% 
+df1.days %>% 
     magrittr::extract2("all") %>% 
     acf(1000)
 
@@ -84,7 +96,7 @@ df0.days %>%
 ### 03) Type vs time: monthly number of incidents by type
 ## raster/tile/rectangle
 df4.match %>% 
-    count(month.mid, type) %>%
+    dplyr::count(month.mid, type) %>% 
     ggplot(aes(month.mid, type, fill = n)) + 
     geom_tile() + # geom_raster() fails big here
     scale_fill_gradientn(name = NULL,
@@ -108,7 +120,7 @@ df4.match %>%
 ### 04) Line vs time: monthly number of incidents by line
 ## raster/tile/rectangle
 df4.match %>% 
-    count(month.mid, line) %>%
+    dplyr::count(month.mid, line) %>%
     ggplot(aes(month.mid, line)) + # flexible location of fill
     geom_tile(aes(fill = n)) +
     scale_fill_gradientn(name = NULL,
@@ -129,7 +141,7 @@ df4.match %>%
 ### 05) efficiency
 ## of MTR
 df4.match %>% 
-    filter(downtime != 0 & !is.na(downtime)) %>%
+    dplyr::filter(downtime != 0 & !is.na(downtime)) %>%
     ggplot(aes(downtime)) + 
     geom_histogram(binwidth = 10, center = 10 / 2) + 
     coord_cartesian(xlim = c(-10, 800)) + 
@@ -149,22 +161,22 @@ df4.match %>%
 
 
 ### 06) Bar chart of daily number of incidents, for 2 types and 2 lines
-df0.days %>% 
+df1.days %>% 
     ggplot(aes(signal)) + # flexible position of aes - see below
     geom_bar() +
     labs(title = "Bar chart of daily number of signal faults",
          x = "Number of incidents", y = "Count of days")
-df0.days %>% 
+df1.days %>% 
     ggplot + 
     geom_bar(aes(train)) + # flexible position of aes - see above
     labs(title = "Bar chart of daily number of faulty trains",
          x = "Number of incidents", y = "Count of days")
-df0.days %>% 
+df1.days %>% 
     ggplot(aes(east.rail)) +
     geom_bar() +
     labs(title = "Bar chart of daily number of incidents, East Rail Line",
          x = "Number of incidents", y = "Count of days")
-df0.days %>% 
+df1.days %>% 
     ggplot + 
     geom_bar(aes(kwun.tong)) + 
     labs(title = "Bar chart of daily number of incidents, Kwun Tong Line",
@@ -176,28 +188,28 @@ df0.days %>%
 
 
 ### 07) Bar chart of daily number of incidents, with fitted results
-df0.days %>% 
+df1.days %>% 
     ggplot(aes(all)) + 
     geom_bar() + # counted when visualising
     labs(title = "Bar chart of daily number of all incidents",
          x = "Number of incidents", y = "Count of days")
 ## above and below produce the SAME plot!
 ## this is where objects obtained in modelling.R kick in
-df0.counts %>% # counted when extracting
+df1.counts %>% # counted when modelling
     ggplot(aes(count, all)) + 
     geom_bar(stat = "identity") + # this is the trick
     labs(title = "Bar chart of daily number of all incidents",
          x = "Number of incidents", y = "Count of days")
 ## after fitting, compare w/ above - same, but add estimated values
-df0.counts %>% 
-    gather(type, value, all, all.est.nb) %>% 
+df1.counts %>% 
+    tidyr::gather(type, value, all, all.est.rqk) %>% 
     ggplot(aes(count, value)) + 
     geom_bar(aes(fill = type), stat = "identity", position = "dodge") + 
     labs(title = "Bar chart of daily number of all incidents",
          x = "Number of incidents", y = "Count of days") + 
     scale_fill_discrete(name = NULL, 
                         labels = c("Observed", "Estimated"),
-                        breaks = c("all", "all.est.nb"))
+                        breaks = c("all", "all.est.rqk"))
 
 
 

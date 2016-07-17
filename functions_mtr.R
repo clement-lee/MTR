@@ -1,3 +1,13 @@
+library(magrittr) # pipe operator
+library(rjson) # read files in json format
+library(lubridate) # dates
+library(readr) # read from files
+library(stringr) # string manipulation
+library(plyr) # matrices and lists manipulation
+library(dplyr) # data frame manipulation
+library(tidyr) # tidy the data set
+library(data.table) # bind multiple data frames
+
 from_raw <- function(name, replacement) {
     ## read a raw data file, manipulate, and output a data frame
     df <- readr::read_csv(name) %>% 
