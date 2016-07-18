@@ -32,14 +32,20 @@ df4.match %>%
          y = "Number of incidents") + 
     coord_flip()
 
-## bar chart by type
+## bar chart by type (in chinese)
 jpeg(filename = "by_type_chi.jpg", 1920, 1080, res = 200, quality = 100)
-df4.match %>% 
-    ggplot(aes(type.chi)) + 
-    geom_bar() +
-    theme(axis.title.y = element_blank()) + # y is AFTER flipping
+levels.type <- df4.match %>%
+    dplyr::count(type.chi) %>%
+    dplyr::arrange(desc(n)) %>%
+    magrittr::extract2("type.chi")
+df4.match %>%
+    dplyr::mutate(type.chi = type.chi %>% factor(levels = levels.type)) %>% 
+    ggplot(aes(type.chi)) +
+    geom_bar() + 
     labs(y = "\u4E8B\u6545\u5B97\u6578") + # y is before flipping
-    coord_flip()
+    scale_y_continuous(breaks = (0:6) * 50, limits = c(0, 290)) +
+    coord_flip() +
+    theme(axis.title.y = element_blank()) # y is AFTER flipping (even if put before)
 dev.off()
 
 ## bar chart by line
@@ -52,12 +58,18 @@ df4.match %>%
 
 ### bar chart by line (in chinese)
 jpeg(filename = "by_line_chi.jpg", 1920, 1080, res = 200, quality = 100)
+levels.line <- df4.match %>%
+    dplyr::count(line.chi) %>%
+    dplyr::arrange(desc(n)) %>%
+    magrittr::extract2("line.chi")
 df4.match %>%
+    dplyr::mutate(line.chi = line.chi %>% factor(levels.line)) %>%
     ggplot(aes(line.chi)) +
     geom_bar() +
-    theme(axis.title.y = element_blank()) + # y is AFTER flipping
     labs(y = "\u4E8B\u6545\u5B97\u6578") + # y is before flipping
-    coord_flip()
+    scale_y_continuous(breaks = (0:6) * 25, limits = c(0, 150)) +
+    coord_flip() +
+    theme(axis.title.y = element_blank()) # y is AFTER flipping
 dev.off()
 
 
@@ -100,11 +112,14 @@ df1.days %>% # essentially df1.days + w/ model estimates
 
 ## time series plots (in chinese)
 jpeg(filename = "by_month_chi.jpg", 1920, 1080, res = 200, quality = 100)
-df0.months %>% 
+df0.months %>%
     ggplot(aes(month, all)) + 
     geom_line() + 
-    geom_point() + 
-    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578")
+    geom_point() +
+    geom_vline(xintercept = "2014-06-22" %>% as.Date %>% as.numeric, linetype = 2, col = 2, lwd = 1.2) +
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578") +
+    scale_y_continuous(breaks = (0:5) * 5, limits = c(0, 25)) +
+    scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y")
 dev.off()
 
 jpeg(filename = "by_week_chi.jpg", 1920, 1080, res = 200, quality = 100)
@@ -112,7 +127,10 @@ df0.weeks %>%
     ggplot(aes(week, all)) + 
     geom_line() + 
     geom_point() +
-    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578")
+    geom_vline(xintercept = "2014-06-22" %>% as.Date %>% as.numeric, linetype = 2, col = 2, lwd = 1.2) +
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578") +
+    scale_y_continuous(breaks = (0:5) * 2, limits = c(0, 11)) +
+    scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y")
 dev.off()
 
 jpeg(filename = "by_day_chi.jpg", 1920, 1080, res = 200, quality = 100)
@@ -120,7 +138,10 @@ df1.days %>% # essentially df1.days + w/ model estimates
     ggplot(aes(op_date, all)) + 
     geom_line() + 
     geom_point() +
-    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578")
+    geom_vline(xintercept = "2014-06-22" %>% as.Date %>% as.numeric, linetype = 2, col = 2, lwd = 1.2) +
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578") +
+    scale_y_continuous(breaks = 0:6) +
+    scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y")
 dev.off()
 
 ## ACF (to show independence)
@@ -153,16 +174,19 @@ df4.match %>%
 
 ## raster/tile/rectangle (in chinese)
 jpeg(filename = "month_by_type_chi.jpg", 1920, 1080, res = 200, quality = 100)
-df4.match %>% 
+df4.match %>%
+    dplyr::mutate(type.chi = type.chi %>% factor(levels = levels.type)) %>% 
     dplyr::count(month.mid, type.chi) %>% 
     ggplot(aes(month.mid, type.chi, fill = n)) + 
     geom_tile() +
-    scale_fill_gradientn(name = NULL,
+    scale_fill_gradientn(name = "\u4E8B\u6545\u5B97\u6578",
                          colours = topo.colors(12) %>% rev,
+                         limits = c(0, 13.5),
                          breaks = c(1, 4, 7, 10, 13)) + 
     labs(x = "\u5E74\u4EFD") +
-    theme(axis.title.y = element_blank()) + # y is AFTER flipping
-    coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01")))
+    coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01"))) +
+    scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y") +
+    theme(axis.title.y = element_blank())
 dev.off()
 
 ## stacked histogram over time
@@ -190,15 +214,18 @@ df4.match %>%
 
 ## raster/tile/rectangle by line (in chinese)
 jpeg(filename = "month_by_line_chi.jpg", 1920, 1080, res = 200, quality = 100)
-df4.match %>% 
+df4.match %>%
+    dplyr::mutate(line.chi = line.chi %>% factor(levels = levels.line)) %>% 
     dplyr::count(month.mid, line.chi) %>%
     ggplot(aes(month.mid, line.chi)) + # flexible location of fill
     geom_tile(aes(fill = n)) +
-    scale_fill_gradientn(name = NULL,
-                         colours = topo.colors(12) %>% rev) + 
+    scale_fill_gradientn(name = "\u4E8B\u6545\u5B97\u6578",
+                         colours = topo.colors(12) %>% rev,
+                         limits = c(0, 8.5),
+                         breaks = c(2, 4, 6, 8)) + 
     labs(x = "\u5E74\u4EFD") +
-    theme(axis.title.y = element_blank()) + # y is AFTER flipping
-    coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01")))
+    coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01"))) +
+    theme(axis.title.y = element_blank())
 dev.off()
 
 ## stacked histogram over time
@@ -228,7 +255,9 @@ df4.match %>%
     ggplot(aes(downtime)) + 
     geom_histogram(binwidth = 10, center = 10 / 2) + 
     coord_cartesian(xlim = c(-10, 800)) + 
-    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578")
+    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578") +
+    scale_x_continuous(breaks = (0:8) * 100) +
+    scale_y_continuous(limits = c(0, 90), breaks = (0:4) * 20)
 dev.off()
 
 ## of mtrupdate
@@ -245,7 +274,9 @@ df4.match %>%
     ggplot(aes(timediff.x)) +  
     geom_histogram(binwidth = 2, center = 2 / 2) + 
     coord_cartesian(xlim = c(-10, 100)) + 
-    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578")
+    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578") +
+    scale_x_continuous(breaks = (0:5) * 20) +
+    scale_y_continuous(breaks = (0:5) * 20)
 dev.off()
 
 
@@ -313,7 +344,8 @@ df1.counts %>%
     labs(x = "\u6BCF\u65E5\u4E8B\u6545\u5B97\u6578", y = "\u65E5\u6578") +
     scale_fill_discrete(name = NULL, 
                         labels = c("\u6578\u64DA", "\u6A21\u578B\u4F30\u7B97"),
-                        breaks = c("all", "all.est.rqk"))
+                        breaks = c("all", "all.est.rqk")) +
+    scale_x_continuous(breaks = (0:6))
 dev.off()
 
 
