@@ -32,6 +32,16 @@ df4.match %>%
          y = "Number of incidents") + 
     coord_flip()
 
+## bar chart by type
+jpeg(filename = "by_type_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df4.match %>% 
+    ggplot(aes(type.chi)) + 
+    geom_bar() +
+    theme(axis.title.y = element_blank()) + # y is AFTER flipping
+    labs(y = "\u4E8B\u6545\u5B97\u6578") + # y is before flipping
+    coord_flip()
+dev.off()
+
 ## bar chart by line
 df4.match %>% 
     ggplot() + 
@@ -39,6 +49,16 @@ df4.match %>%
     labs(title = "Number of incidents by line",
          y = "Number of incidents") +
     coord_flip()
+
+### bar chart by line (in chinese)
+jpeg(filename = "by_line_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df4.match %>%
+    ggplot(aes(line.chi)) +
+    geom_bar() +
+    theme(axis.title.y = element_blank()) + # y is AFTER flipping
+    labs(y = "\u4E8B\u6545\u5B97\u6578") + # y is before flipping
+    coord_flip()
+dev.off()
 
 
 
@@ -78,6 +98,31 @@ df1.days %>% # essentially df1.days + w/ model estimates
     labs(title = "Daily number of all incidents",
          x = "Time", y = "Number of incidents")
 
+## time series plots (in chinese)
+jpeg(filename = "by_month_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df0.months %>% 
+    ggplot(aes(month, all)) + 
+    geom_line() + 
+    geom_point() + 
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578")
+dev.off()
+
+jpeg(filename = "by_week_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df0.weeks %>% 
+    ggplot(aes(week, all)) + 
+    geom_line() + 
+    geom_point() +
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578")
+dev.off()
+
+jpeg(filename = "by_day_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df1.days %>% # essentially df1.days + w/ model estimates
+    ggplot(aes(op_date, all)) + 
+    geom_line() + 
+    geom_point() +
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578")
+dev.off()
+
 ## ACF (to show independence)
 df0.months %>% 
     magrittr::extract2("all") %>% 
@@ -106,6 +151,20 @@ df4.match %>%
          x = "Time", y = "Type") +
     coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01")))
 
+## raster/tile/rectangle (in chinese)
+jpeg(filename = "month_by_type_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df4.match %>% 
+    dplyr::count(month.mid, type.chi) %>% 
+    ggplot(aes(month.mid, type.chi, fill = n)) + 
+    geom_tile() +
+    scale_fill_gradientn(name = NULL,
+                         colours = topo.colors(12) %>% rev,
+                         breaks = c(1, 4, 7, 10, 13)) + 
+    labs(x = "\u5E74\u4EFD") +
+    theme(axis.title.y = element_blank()) + # y is AFTER flipping
+    coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01")))
+dev.off()
+
 ## stacked histogram over time
 df4.match %>% 
     ggplot(aes(month.mid)) + 
@@ -129,11 +188,25 @@ df4.match %>%
          x = "Time", y = "Line") +
     coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01")))
 
+## raster/tile/rectangle by line (in chinese)
+jpeg(filename = "month_by_line_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df4.match %>% 
+    dplyr::count(month.mid, line.chi) %>%
+    ggplot(aes(month.mid, line.chi)) + # flexible location of fill
+    geom_tile(aes(fill = n)) +
+    scale_fill_gradientn(name = NULL,
+                         colours = topo.colors(12) %>% rev) + 
+    labs(x = "\u5E74\u4EFD") +
+    theme(axis.title.y = element_blank()) + # y is AFTER flipping
+    coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01")))
+dev.off()
+
 ## stacked histogram over time
 df4.match %>% 
     ggplot(aes(month.mid)) + 
     geom_histogram(aes(fill = line), bins = 63) +
     labs(x = "Time", y = "Count") # not very easily interpretable
+
 
 
 
@@ -148,6 +221,16 @@ df4.match %>%
     labs(title = "Histogram of incident downtime",
          x = "Minutes", y = "Number of incidents")
 
+## of MTR (in chinese)
+jpeg(filename = "downtime_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df4.match %>% 
+    dplyr::filter(downtime != 0 & !is.na(downtime)) %>%
+    ggplot(aes(downtime)) + 
+    geom_histogram(binwidth = 10, center = 10 / 2) + 
+    coord_cartesian(xlim = c(-10, 800)) + 
+    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578")
+dev.off()
+
 ## of mtrupdate
 df4.match %>% 
     ggplot(aes(timediff.x)) +  
@@ -155,6 +238,15 @@ df4.match %>%
     coord_cartesian(xlim = c(-10, 100)) + 
     labs(title = "Histogram of reaction time of mtrupdate",
          x = "Minutes", y = "Number of incidents")
+
+## of mtrupdate (in chinese)
+jpeg(filename = "reaction_time_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df4.match %>% 
+    ggplot(aes(timediff.x)) +  
+    geom_histogram(binwidth = 2, center = 2 / 2) + 
+    coord_cartesian(xlim = c(-10, 100)) + 
+    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578")
+dev.off()
 
 
 
@@ -211,6 +303,18 @@ df1.counts %>%
                         labels = c("Observed", "Estimated"),
                         breaks = c("all", "all.est.rqk"))
 
+## in chinese
+jpeg(filename = "bar_observed_estimated_chi.jpg", 1920, 1080, res = 200, quality = 100)
+df1.counts %>%
+    filter(count != 0) %>% 
+    tidyr::gather(type, value, all, all.est.rqk) %>% 
+    ggplot(aes(count, value)) + 
+    geom_bar(aes(fill = type), stat = "identity", position = "dodge") +
+    labs(x = "\u6BCF\u65E5\u4E8B\u6545\u5B97\u6578", y = "\u65E5\u6578") +
+    scale_fill_discrete(name = NULL, 
+                        labels = c("\u6578\u64DA", "\u6A21\u578B\u4F30\u7B97"),
+                        breaks = c("all", "all.est.rqk"))
+dev.off()
 
 
 

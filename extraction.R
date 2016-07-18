@@ -33,6 +33,8 @@ typo <- c("Tsueng Kwan O" = "Tseung Kwan O",
           "Fault Track" = "Faulty Track")
 df.lines <- readr::read_csv("lines.csv") %>%
     select(line = 1, line.chi = 2) # for lines in chinese
+df.types <- readr::read_csv("types.csv") %>%
+    select(type = 1, type.chi = 2) # for types in chinese
 
 
 
@@ -107,7 +109,8 @@ df4.match <- df3.match %>%
     mutate(month = op_date %>% cut(breaks = "month") %>% as.Date, # alt: month1 = op_date %>% lubridate::floor_date("month")
            month.mid = month + days(14), # mid-month, quick fix for position adjustment
            week = op_date %>% cut(breaks = "week") %>% as.Date) %>% 
-    left_join(df.lines, by = "line")
+    left_join(df.lines, by = "line") %>%
+    left_join(df.types, by = "type")
 write_csv(df4.match, "incidents.csv")
 ## Cross check with df3.match for any future changes, to make sure there are no unwanted omission.
 ## Issues: incidents with NA good service tweets can't have downtime computed.

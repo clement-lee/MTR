@@ -1,0 +1,9 @@
+﻿type,type.chi
+unknown,未知原因
+train,列車故障
+track,路軌出現問題
+signal,訊號故障
+power,架空電纜故障
+engine,工程問題
+electric,電力設備故障
+door,月台門故障
