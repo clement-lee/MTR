@@ -117,7 +117,7 @@ df0.months %>%
     geom_line() + 
     geom_point() +
     geom_vline(xintercept = "2014-06-22" %>% as.Date %>% as.numeric, linetype = 2, col = 2, lwd = 1.2) +
-    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578") +
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578", title = "\u5716 3") +
     scale_y_continuous(breaks = (0:5) * 5, limits = c(0, 25)) +
     scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y")
 dev.off()
@@ -128,7 +128,7 @@ df0.weeks %>%
     geom_line() + 
     geom_point() +
     geom_vline(xintercept = "2014-06-22" %>% as.Date %>% as.numeric, linetype = 2, col = 2, lwd = 1.2) +
-    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578") +
+    labs(x = "\u5E74\u4EFD", y = "\u4E8B\u6545\u5B97\u6578", title = "\u5716 4") +
     scale_y_continuous(breaks = (0:5) * 2, limits = c(0, 11)) +
     scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y")
 dev.off()
@@ -183,7 +183,7 @@ df4.match %>%
                          colours = topo.colors(12) %>% rev,
                          limits = c(0, 13.5),
                          breaks = c(1, 4, 7, 10, 13)) + 
-    labs(x = "\u5E74\u4EFD") +
+    labs(x = "\u5E74\u4EFD", title = "\u5716 2") +
     coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01"))) +
     scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y") +
     theme(axis.title.y = element_blank())
@@ -223,8 +223,9 @@ df4.match %>%
                          colours = topo.colors(12) %>% rev,
                          limits = c(0, 8.5),
                          breaks = c(2, 4, 6, 8)) + 
-    labs(x = "\u5E74\u4EFD") +
+    labs(x = "\u5E74\u4EFD", title = "\u5716 1") +
     coord_cartesian(xlim = c(as.Date("2011-03-01"), as.Date("2016-02-01"))) +
+    scale_x_date(breaks = as.Date("2011-01-01") + years(0:5), date_labels = "%Y") +
     theme(axis.title.y = element_blank())
 dev.off()
 
@@ -255,7 +256,7 @@ df4.match %>%
     ggplot(aes(downtime)) + 
     geom_histogram(binwidth = 10, center = 10 / 2) + 
     coord_cartesian(xlim = c(-10, 800)) + 
-    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578") +
+    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578", title = "\u5716 6") +
     scale_x_continuous(breaks = (0:8) * 100) +
     scale_y_continuous(limits = c(0, 90), breaks = (0:4) * 20)
 dev.off()
@@ -264,7 +265,7 @@ dev.off()
 df4.match %>% 
     ggplot(aes(timediff.x)) +  
     geom_histogram(binwidth = 2, center = 2 / 2) + 
-    coord_cartesian(xlim = c(-10, 100)) + 
+    coord_cartesian(xlim = c(-10, 200)) + 
     labs(title = "Histogram of reaction time of mtrupdate",
          x = "Minutes", y = "Number of incidents")
 
@@ -273,9 +274,9 @@ jpeg(filename = "reaction_time_chi.jpg", 1920, 1080, res = 200, quality = 100)
 df4.match %>% 
     ggplot(aes(timediff.x)) +  
     geom_histogram(binwidth = 2, center = 2 / 2) + 
-    coord_cartesian(xlim = c(-10, 100)) + 
-    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578") +
-    scale_x_continuous(breaks = (0:5) * 20) +
+    coord_cartesian(xlim = c(-10, 200)) + 
+    labs(x = "\u5206\u9418", y = "\u4E8B\u6545\u5B97\u6578", title = "\u5716 7") +
+    scale_x_continuous(breaks = (0:8) * 25) +
     scale_y_continuous(breaks = (0:5) * 20)
 dev.off()
 
@@ -341,7 +342,7 @@ df1.counts %>%
     tidyr::gather(type, value, all, all.est.rqk) %>% 
     ggplot(aes(count, value)) + 
     geom_bar(aes(fill = type), stat = "identity", position = "dodge") +
-    labs(x = "\u6BCF\u65E5\u4E8B\u6545\u5B97\u6578", y = "\u65E5\u6578") +
+    labs(x = "\u6BCF\u65E5\u4E8B\u6545\u5B97\u6578", y = "\u65E5\u6578", title = "\u5716 5") +
     scale_fill_discrete(name = NULL, 
                         labels = c("\u6578\u64DA", "\u6A21\u578B\u4F30\u7B97"),
                         breaks = c("all", "all.est.rqk")) +
